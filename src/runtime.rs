@@ -33,6 +33,7 @@ impl Runtime for AppchainRuntime {
         event_type_registry.with_staking();
         event_type_registry.with_contracts();
         event_type_registry.with_sudo();
+        event_type_registry.register_type_size::<pallet_octopus_appchain::ValidatorSet<<Self as System>::AccountId>>("ValidatorSet<AccountId>");
         register_default_type_sizes(event_type_registry);
     }
 }
