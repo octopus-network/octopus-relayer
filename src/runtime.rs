@@ -7,7 +7,6 @@ use sp_runtime::{
 };
 use substrate_subxt::{
     balances::{AccountData, Balances, BalancesEventTypeRegistry},
-    contracts::{Contracts, ContractsEventTypeRegistry},
     extrinsic::DefaultExtra,
     register_default_type_sizes,
     session::{Session, SessionEventTypeRegistry},
@@ -31,9 +30,10 @@ impl Runtime for AppchainRuntime {
         event_type_registry.with_balances();
         event_type_registry.with_session();
         event_type_registry.with_staking();
-        event_type_registry.with_contracts();
         event_type_registry.with_sudo();
-        event_type_registry.register_type_size::<pallet_octopus_appchain::ValidatorSet<<Self as System>::AccountId>>("ValidatorSet<AccountId>");
+        event_type_registry.register_type_size::<pallet_octopus_appchain::ValidatorSet<<Self as System>::AccountId>>("ValidatorSet<T::AccountId>");
+        event_type_registry.register_type_size::<u32>("AssetIdOf<T>");
+        event_type_registry.register_type_size::<u64>("AssetBalanceOf<T>");
         register_default_type_sizes(event_type_registry);
     }
 }
@@ -58,8 +58,6 @@ impl Session for AppchainRuntime {
     type ValidatorId = <Self as System>::AccountId;
     type Keys = BasicSessionKeys;
 }
-
-impl Contracts for AppchainRuntime {}
 
 impl Sudo for AppchainRuntime {}
 

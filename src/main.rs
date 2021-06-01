@@ -7,7 +7,8 @@ mod beefy;
 mod runtime;
 use beefy::{AuthoritiesStoreExt, ValidatorSetIdStoreExt};
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut lc = beefy_light_client::new();
     lc.import(SignedCommitment {
         commitment: Commitment {
@@ -24,8 +25,11 @@ fn main() {
         (),
     ));
     println!("verify result: {:?}", result);
-    let result = async_std::task::block_on(run());
-    println!("result: {:?}", result);
+    let task = tokio::spawn(async {
+        let _ = run().await;
+    });
+    task.await.unwrap();
+    Ok(())
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {

@@ -4,10 +4,8 @@ version = "0.1.0"
 authors = ["Yuanchao Sun <yuanchao.sun@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-async-std = { version = "1.9.0", features = ["attributes"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 codec = { version = "2.0.0", package = "parity-scale-codec", features = ["derive"] }
 beefy-light-client = { git = "https://github.com/octopus-network/beefy-light-client", branch = "main" }
