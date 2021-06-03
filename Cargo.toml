@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+env_logger = "0.8.3"
 
 codec = { version = "2.0.0", package = "parity-scale-codec", features = ["derive"] }
 beefy-light-client = { git = "https://github.com/octopus-network/beefy-light-client", branch = "main" }

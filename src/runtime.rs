@@ -1,4 +1,5 @@
 use crate::beefy::Beefy;
+use crate::octopus::OctopusAppchain;
 use beefy_primitives::ecdsa::AuthorityId as BeefyId;
 use sp_runtime::{
     generic::Header,
@@ -34,6 +35,7 @@ impl Runtime for AppchainRuntime {
         event_type_registry.register_type_size::<pallet_octopus_appchain::ValidatorSet<<Self as System>::AccountId>>("ValidatorSet<T::AccountId>");
         event_type_registry.register_type_size::<u32>("AssetIdOf<T>");
         event_type_registry.register_type_size::<u64>("AssetBalanceOf<T>");
+        event_type_registry.register_type_size::<u64>("TAssetBalance");
         register_default_type_sizes(event_type_registry);
     }
 }
@@ -64,3 +66,5 @@ impl Sudo for AppchainRuntime {}
 impl Beefy for AppchainRuntime {
     type AuthorityId = BeefyId;
 }
+
+impl OctopusAppchain for AppchainRuntime {}
