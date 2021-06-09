@@ -1,6 +1,7 @@
 use beefy_light_client::{validator_set, Commitment, Payload, SignedCommitment};
 use beefy_primitives::ecdsa::AuthoritySignature as BeefySignature;
 use codec::Decode;
+use sp_runtime::DigestItem;
 use substrate_subxt::{system::System, BlockNumber, Client, ClientBuilder, EventSubscription};
 
 mod beefy;
@@ -37,13 +38,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client1 = client.clone();
     let task1 = tokio::spawn(async move {
-        let _ = subscribe_events(client1).await;
+        let _ = subscribe_finalized_blocks(client1).await;
     });
 
     let task2 = tokio::spawn(async {
         let _ = run(client).await;
     });
     let _ = tokio::join!(task1, task2);
+    Ok(())
+}
+
+async fn subscribe_finalized_blocks(
+    client: Client<runtime::AppchainRuntime>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut blocks = client.subscribe_finalized_blocks().await?;
+    while let Some(header) = blocks.next().await {
+        println!("new finalized header {:?}", header);
+        if let Some(commitment) = header.digest.log(DigestItem::as_other) {
+            // identify it is a commitment
+            println!("commitment: {:?}", hex::encode(commitment));
+        }
+    }
     Ok(())
 }
 
