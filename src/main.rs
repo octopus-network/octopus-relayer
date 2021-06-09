@@ -1,5 +1,6 @@
 use beefy_light_client::{validator_set, Commitment, Payload, SignedCommitment};
 use beefy_primitives::ecdsa::AuthoritySignature as BeefySignature;
+use borsh::{BorshDeserialize, BorshSerialize};
 use codec::{Decode, Encode};
 use sp_core::{offchain::StorageKind, Bytes, H256};
 use sp_runtime::DigestItem;
@@ -10,6 +11,20 @@ mod octopus;
 mod runtime;
 use beefy::{AuthoritiesStoreExt, ValidatorSetIdStoreExt};
 use octopus::BurnedEvent;
+
+#[derive(Encode, Decode, Debug)]
+pub struct Message {
+    nonce: u64,
+    payload: Vec<u8>,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub struct XTransferPayload {
+    pub token_id: Vec<u8>,
+    pub sender: Vec<u8>,
+    pub receiver_id: Vec<u8>,
+    pub amount: u128,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -58,8 +73,17 @@ async fn subscribe_finalized_blocks(
         if let Some(commitment) = header.digest.log(DigestItem::as_other) {
             // identify it is a commitment
             println!("commitment: {:?}", hex::encode(commitment));
-            let data = get_offchain_data_for_commitment(&client, commitment.to_vec()).await;
+            let data = get_offchain_data_for_commitment(&client, commitment.to_vec())
+                .await
+                .unwrap()
+                .unwrap();
             println!("data: {:?}", data);
+            let messages: Vec<Message> = Decode::decode(&mut &*data).unwrap();
+            println!("messages: {:?}", messages);
+            for message in messages.iter() {
+                let decoded_message = XTransferPayload::try_from_slice(&message.payload).unwrap();
+                println!("decoded_message: {:?}", decoded_message);
+            }
         }
     }
     Ok(())
