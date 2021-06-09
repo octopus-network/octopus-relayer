@@ -1,6 +1,7 @@
 use beefy_light_client::{validator_set, Commitment, Payload, SignedCommitment};
 use beefy_primitives::ecdsa::AuthoritySignature as BeefySignature;
-use codec::Decode;
+use codec::{Decode, Encode};
+use sp_core::{offchain::StorageKind, Bytes, H256};
 use sp_runtime::DigestItem;
 use substrate_subxt::{system::System, BlockNumber, Client, ClientBuilder, EventSubscription};
 
@@ -57,9 +58,23 @@ async fn subscribe_finalized_blocks(
         if let Some(commitment) = header.digest.log(DigestItem::as_other) {
             // identify it is a commitment
             println!("commitment: {:?}", hex::encode(commitment));
+            let data = get_offchain_data_for_commitment(&client, commitment.to_vec()).await;
+            println!("data: {:?}", data);
         }
     }
     Ok(())
+}
+
+async fn get_offchain_data_for_commitment(
+    client: &Client<runtime::AppchainRuntime>,
+    commitment: Vec<u8>,
+) -> Result<Option<Bytes>, Box<dyn std::error::Error>> {
+    let hash = H256::from_slice(&commitment[..]);
+    let key = (b"commitment", hash).encode();
+    let data = client
+        .local_storage_get(StorageKind::PERSISTENT, key.into())
+        .await?;
+    Ok(data)
 }
 
 async fn subscribe_events(
