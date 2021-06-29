@@ -68,7 +68,7 @@ async fn subscribe_finalized_blocks(
     client: Client<runtime::AppchainRuntime>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut blocks = client.subscribe_finalized_blocks().await?;
-    while let Some(header) = blocks.next().await {
+    while let Ok(Some(header)) = blocks.next().await {
         println!("new finalized header {:?}", header);
         if let Some(commitment) = header.digest.log(DigestItem::as_other) {
             // identify it is a commitment
@@ -126,7 +126,7 @@ async fn subscribe_events(
 
 async fn run(client: Client<runtime::AppchainRuntime>) -> Result<(), Box<dyn std::error::Error>> {
     let mut commitments = client.subscribe_justifications().await?;
-    while let Some(commitment) = commitments.next().await {
+    while let Ok(Some(commitment)) = commitments.next().await {
         let decoded: beefy_primitives::SignedCommitment<
             <runtime::AppchainRuntime as System>::BlockNumber,
             beefy_primitives::MmrRootHash,
