@@ -6,14 +6,19 @@ import Logger, { LOGGING_LEVEL } from "./logger";
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
+import './interfaces/augment-api';
+import './interfaces/augment-types';
+
+import * as definitions from './interfaces/definitions';
 
 const relayId = "dev-oct-relay.testnet";
 const receiverId = "test-receiver-id.testnet";
 const tokenId = "test-stable.testnet";
 
 async function init() {
-  const wsProvider = new WsProvider("wss://rpc.polkadot.io");
-  const appchain = await ApiPromise.create({ provider: wsProvider });
+  const types = Object.values(definitions).reduce((res, { types }): object => ({ ...res, ...types }), {});
+  const wsProvider = new WsProvider("ws://localhost:9944");
+  const appchain = await ApiPromise.create({ provider: wsProvider, types: { ...types, 'Moment': 'u64' } });
 
   const privateKey =
     "ed25519:2xUVVWxJamN17xYCP5Ev4oyhJ8MK6JN6xY3nS5vmdPHiAjoR5gjsk67R12EQTauphv21UYEvzDG8p19SHmSc33wX";
@@ -51,13 +56,23 @@ async function unlockOnNear(account: Account) {
 
 async function listenEvents(appchain: ApiPromise) {
   appchain.query.system.events((events) => {
-    console.log(`Received ${events.length} events`);
+    console.log(`\>>> ${events}`);
+    console.log(`\nReceived ${events.length} events:`);
+
+    // Loop through the Vec<EventRecord>
     events.forEach((record) => {
+      // Extract the phase, event and the event types
       const { event, phase } = record;
       const types = event.typeDef;
-      // console.log("event", event);
-      // console.log("phase", phase);
-      // console.log("types", types);
+
+      // Show what we are busy with
+      console.log(`\t${event.section}:${event.method}:: (phase=${phase.toString()})`);
+      console.log(`\t\t${event.meta.documentation.toString()}`);
+
+      // Loop through each of the parameters, displaying the type and data
+      event.data.forEach((data, index) => {
+        console.log(`\t\t\t${types[index].type}: ${data.toString()}`);
+      });
     });
   });
 }
@@ -66,9 +81,12 @@ async function testSample() {
   const { appchain, account } = await init();
   console.log("here to test");
   // test unlock, 0.1 TSB everytime
-  unlockOnNear(account);
+  // unlockOnNear(account);
   // test events
   listenEvents(appchain);
 }
 
-testSample();
+testSample().catch((error) => {
+  console.error(error);
+  process.exit(-1);
+});
