@@ -6,12 +6,13 @@ import Logger, { LOGGING_LEVEL } from "./logger";
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
+import { decodeAddress, encodeAddress } from "@polkadot/keyring";
 
 import types from "./interfaces/types";
 
+const appchain_id = "testchain";
 const relayId = "dev-oct-relay.testnet";
-const receiverId = "test-receiver-id.testnet";
-const tokenId = "test-stable.testnet";
+const DEFAULT_GAS = new BN("300000000000000");
 
 async function init() {
   const wsProvider = new WsProvider(
@@ -19,33 +20,7 @@ async function init() {
   );
   const appchain = await ApiPromise.create({
     provider: wsProvider,
-    types: {
-      Validator: {
-        id: "AccountId",
-        weight: "u128",
-      },
-      ValidatorSet: {
-        sequence_number: "u32",
-        set_id: "u32",
-        validators: "Vec<Validator>",
-      },
-      LockEvent: {
-        sequence_number: "u32",
-        token_id: "Vec<u8>",
-        sender_id: "Vec<u8>",
-        receiver: "AccountId",
-        amount: "u128",
-      },
-      AssetIdOf: "u32",
-      AssetBalanceOf: "u128",
-      TAssetBalance: "u128",
-      Observation: {
-        _enum: {
-          UpdateValidatorSet: "(ValidatorSet)",
-          LockToken: "(LockEvent)",
-        },
-      },
-    },
+    types,
   });
 
   const privateKey =
@@ -65,28 +40,29 @@ async function init() {
   return { appchain, account };
 }
 
-async function unlockOnNear(account: Account) {
+async function unlockOnNear(
+  account: Account,
+  sender: String,
+  receiver_id: String,
+  amount: String
+) {
   const result = await account.functionCall(
     relayId,
     "unlock_token",
     {
-      appchain_id: "testchain",
-      token_id: tokenId,
-      sender:
-        "0xc425bbf59c7bf49e4fcc6547539d84ba8ecd2fb171f5b83cde3571d45d0c8224",
-      receiver_id: receiverId,
-      amount: "100000000000",
+      appchain_id,
+      token_id: "usdc.testnet",
+      sender,
+      receiver_id,
+      amount: amount,
     },
-    new BN("300000000000000")
+    DEFAULT_GAS
   );
   console.log(result);
 }
 
-async function listenEvents(appchain: ApiPromise) {
+async function listenEvents(appchain: ApiPromise, account: Account) {
   appchain.query.system.events((events) => {
-    console.log(`\>>> ${events}`);
-    console.log(`\nReceived ${events.length} events:`);
-
     // Loop through the Vec<EventRecord>
     events.forEach((record) => {
       // Extract the phase, event and the event types
@@ -94,28 +70,26 @@ async function listenEvents(appchain: ApiPromise) {
       const types = event.typeDef;
 
       if (event.section == "octopusAppchain" && event.method == "Burned") {
-        console.log("event.section==", event.section);
-        console.log("event.method==", event.method);
         const { data } = event;
-        console.log("AssetId: " + data[0]);
-        console.log("data[1]: " + data[1]);
-        console.log("data[2]: " + data[2]);
-        console.log("Amount: " + data[3]);
+        const assetId = data[0];
+        const sender = Buffer.from(decodeAddress(data[1] as any)).toString(
+          "hex"
+        ) as String;
+        const receiver_id = Buffer.from(data[2] as any, "hex").toString("utf8");
+        const amount = data[3].toString();
+
+        unlockOnNear(account, sender, receiver_id, amount);
       }
     });
   });
 }
 
-async function testSample() {
+async function start() {
   const { appchain, account } = await init();
-  console.log("here to test");
-  // test unlock, 0.1 TSB everytime
-  // unlockOnNear(account);
-  // test events
-  listenEvents(appchain);
+  listenEvents(appchain, account);
 }
 
-testSample().catch((error) => {
+start().catch((error) => {
   console.error(error);
   process.exit(-1);
 });

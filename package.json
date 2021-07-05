@@ -17,6 +17,7 @@
   "license": "ISC",
   "dependencies": {
     "@polkadot/api": "^4.17.1",
+    "@polkadot/keyring": "^6.11.1",
     "chalk": "^4.1.1",
     "dotenv": "^10.0.0",
     "near-api-js": "^0.41.0",
