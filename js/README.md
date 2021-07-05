@@ -1,3 +1,0 @@
-## Start
-
-`npm run dev`
