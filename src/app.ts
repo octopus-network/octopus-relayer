@@ -6,19 +6,47 @@ import Logger, { LOGGING_LEVEL } from "./logger";
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
-import './interfaces/augment-api';
-import './interfaces/augment-types';
 
-import * as definitions from './interfaces/definitions';
+import types from "./interfaces/types";
 
 const relayId = "dev-oct-relay.testnet";
 const receiverId = "test-receiver-id.testnet";
 const tokenId = "test-stable.testnet";
 
 async function init() {
-  const types = Object.values(definitions).reduce((res, { types }): object => ({ ...res, ...types }), {});
-  const wsProvider = new WsProvider("ws://localhost:9944");
-  const appchain = await ApiPromise.create({ provider: wsProvider, types: { ...types, 'Moment': 'u64' } });
+  const wsProvider = new WsProvider(
+    "wss://barnacle-dev.rpc.testnet.oct.network:9944"
+  );
+  const appchain = await ApiPromise.create({
+    provider: wsProvider,
+    types: {
+      Validator: {
+        id: "AccountId",
+        weight: "u128",
+      },
+      ValidatorSet: {
+        sequence_number: "u32",
+        set_id: "u32",
+        validators: "Vec<Validator>",
+      },
+      LockEvent: {
+        sequence_number: "u32",
+        token_id: "Vec<u8>",
+        sender_id: "Vec<u8>",
+        receiver: "AccountId",
+        amount: "u128",
+      },
+      AssetIdOf: "u32",
+      AssetBalanceOf: "u128",
+      TAssetBalance: "u128",
+      Observation: {
+        _enum: {
+          UpdateValidatorSet: "(ValidatorSet)",
+          LockToken: "(LockEvent)",
+        },
+      },
+    },
+  });
 
   const privateKey =
     "ed25519:2xUVVWxJamN17xYCP5Ev4oyhJ8MK6JN6xY3nS5vmdPHiAjoR5gjsk67R12EQTauphv21UYEvzDG8p19SHmSc33wX";
@@ -65,14 +93,15 @@ async function listenEvents(appchain: ApiPromise) {
       const { event, phase } = record;
       const types = event.typeDef;
 
-      // Show what we are busy with
-      console.log(`\t${event.section}:${event.method}:: (phase=${phase.toString()})`);
-      console.log(`\t\t${event.meta.documentation.toString()}`);
-
-      // Loop through each of the parameters, displaying the type and data
-      event.data.forEach((data, index) => {
-        console.log(`\t\t\t${types[index].type}: ${data.toString()}`);
-      });
+      if (event.section == "octopusAppchain" && event.method == "Burned") {
+        console.log("event.section==", event.section);
+        console.log("event.method==", event.method);
+        const { data } = event;
+        console.log("AssetId: " + data[0]);
+        console.log("data[1]: " + data[1]);
+        console.log("data[2]: " + data[2]);
+        console.log("Amount: " + data[3]);
+      }
     });
   });
 }
