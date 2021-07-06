@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: octopus-relayer-barnacle
+spec:
+  selector:
+    matchLabels:
+      app: relayer
+  template:
+    metadata:
+      labels:
+        app: relayer
+    spec:
+      containers:
+      - name: relayer
+        image: "gcr.io/octopus-dev-309403/octopus-relayer@sha256:ac4134a9513fc94ceb113390eb1e5d63d5c7d2e59694c9128ce81ae83a452794"
