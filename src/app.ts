@@ -8,7 +8,7 @@ import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
 import { decodeAddress, encodeAddress } from "@polkadot/keyring";
 
-import types from "./interfaces/types";
+import types from "./types";
 
 const appchain_id = "testchain";
 const relayId = "dev-oct-relay.testnet";
