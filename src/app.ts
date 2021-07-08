@@ -4,6 +4,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 import Logger, { LOGGING_LEVEL } from "./logger";
 import { ApiPromise, WsProvider } from "@polkadot/api";
+// import { DigestItem } from "@polkadot/types/interfaces";
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
 import { decodeAddress, encodeAddress } from "@polkadot/keyring";
@@ -82,6 +83,36 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
       }
     });
   });
+
+  appchain.rpc.chain.subscribeFinalizedHeads((header) => {
+    // console.log("new finalized header: " + header);
+    header.digest.logs.forEach(async (log) => {
+      if (log.isOther) {
+        const commitment = log.asOther.toString();
+        const data = await get_offchain_data_for_commitment(
+          appchain,
+          commitment
+        );
+        console.log("data", data);
+        const messages = Buffer.from(data.toString().slice(2), "hex").toString(
+          "ascii"
+        );
+        console.log("messages", messages);
+      }
+    });
+  });
+}
+
+async function get_offchain_data_for_commitment(
+  appchain: ApiPromise,
+  commitment: String
+) {
+  const prefixBuffer = Buffer.from("commitment", "utf8");
+  const key = "0x" + prefixBuffer.toString("hex") + commitment.slice(2);
+  const data = (
+    await appchain.rpc.offchain.localStorageGet("PERSISTENT", key)
+  ).toString();
+  return data;
 }
 
 async function start() {
