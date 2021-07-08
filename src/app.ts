@@ -1,8 +1,3 @@
-import dotenv from "dotenv";
-if (process.env.NODE_ENV !== "production") {
-  dotenv.config();
-}
-import Logger, { LOGGING_LEVEL } from "./logger";
 import { ApiPromise, WsProvider } from "@polkadot/api";
 // import { DigestItem } from "@polkadot/types/interfaces";
 import { connect, keyStores, utils, Account } from "near-api-js";
@@ -14,28 +9,37 @@ import types from "./types";
 const appchain_id = "testchain";
 const relayId = "dev-oct-relay.testnet";
 const DEFAULT_GAS = new BN("300000000000000");
+const {
+  RELAYER_PRIVATE_KEY,
+  APPCHAIN_ENDPOINT,
+  NEAR_NODE_URL,
+  NEAR_WALLET_URL,
+  NEAR_HELPER_URL,
+} = process.env;
+
+console.log("RELAYER_PRIVATE_KEY", RELAYER_PRIVATE_KEY);
+console.log("APPCHAIN_ENDPOINT", APPCHAIN_ENDPOINT);
+console.log("NEAR_NODE_URL", NEAR_NODE_URL);
+console.log("NEAR_WALLET_URL", NEAR_WALLET_URL);
+console.log("NEAR_HELPER_URL", NEAR_HELPER_URL);
 
 async function init() {
-  const wsProvider = new WsProvider(
-    "wss://barnacle-dev.rpc.testnet.oct.network:9944"
-  );
+  const wsProvider = new WsProvider(APPCHAIN_ENDPOINT);
   const appchain = await ApiPromise.create({
     provider: wsProvider,
     types,
   });
 
-  const privateKey =
-    "ed25519:2xUVVWxJamN17xYCP5Ev4oyhJ8MK6JN6xY3nS5vmdPHiAjoR5gjsk67R12EQTauphv21UYEvzDG8p19SHmSc33wX";
-  const keyPair = utils.KeyPair.fromString(privateKey);
+  const keyPair = utils.KeyPair.fromString(RELAYER_PRIVATE_KEY as string);
   const keyStore = new keyStores.InMemoryKeyStore();
   keyStore.setKey("testnet", "test-relayer.testnet", keyPair);
 
   const near = await connect({
     networkId: "testnet",
     keyStore,
-    nodeUrl: "https://rpc.testnet.near.org",
-    walletUrl: "https://wallet.testnet.near.org",
-    helperUrl: "https://helper.testnet.near.org",
+    nodeUrl: NEAR_NODE_URL as string,
+    walletUrl: NEAR_WALLET_URL,
+    helperUrl: NEAR_HELPER_URL,
   });
   const account = await near.account("test-relayer.testnet");
   return { appchain, account };
@@ -43,9 +47,9 @@ async function init() {
 
 async function unlockOnNear(
   account: Account,
-  sender: String,
-  receiver_id: String,
-  amount: String
+  sender: string,
+  receiver_id: string,
+  amount: string
 ) {
   const result = await account.functionCall(
     relayId,
@@ -75,7 +79,7 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
         const assetId = data[0];
         const sender = Buffer.from(decodeAddress(data[1] as any)).toString(
           "hex"
-        ) as String;
+        ) as string;
         const receiver_id = Buffer.from(data[2] as any, "hex").toString("utf8");
         const amount = data[3].toString();
 
@@ -105,7 +109,7 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
 
 async function get_offchain_data_for_commitment(
   appchain: ApiPromise,
-  commitment: String
+  commitment: string
 ) {
   const prefixBuffer = Buffer.from("commitment", "utf8");
   const key = "0x" + prefixBuffer.toString("hex") + commitment.slice(2);
