@@ -13,4 +13,15 @@ spec:
     spec:
       containers:
       - name: relayer
-        image: "gcr.io/octopus-dev-309403/octopus-relayer@sha256:ac4134a9513fc94ceb113390eb1e5d63d5c7d2e59694c9128ce81ae83a452794"
+        image: "gcr.io/octopus-dev-309403/octopus-relayer:latest"
+        env:
+        - name: RELAYER_PRIVATE_KEY
+          value: "ed25519:2xUVVWxJamN17xYCP5Ev4oyhJ8MK6JN6xY3nS5vmdPHiAjoR5gjsk67R12EQTauphv21UYEvzDG8p19SHmSc33wX"
+        - name: APPCHAIN_ENDPOINT
+          value: "wss://barnacle.rpc.testnet.oct.network:9944"
+        - name: NEAR_NODE_URL
+          value: "https://rpc.testnet.near.org"
+        - name: NEAR_WALLET_URL
+          value: "https://wallet.testnet.near.org"
+        - name: NEAR_HELPER_URL
+          value: "https://helper.testnet.near.org"
