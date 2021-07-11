@@ -6,11 +6,11 @@ import { decodeAddress, encodeAddress } from "@polkadot/keyring";
 
 import types from "./types";
 
-const appchain_id = "easydeal-demo";
 const relayId = "dev-oct-relay.testnet";
 
 const DEFAULT_GAS = new BN("300000000000000");
 const {
+  APPCHAIN_ID,
   RELAYER_PRIVATE_KEY,
   APPCHAIN_ENDPOINT,
   NEAR_NODE_URL,
@@ -18,11 +18,17 @@ const {
   NEAR_HELPER_URL,
 } = process.env;
 
+console.log("APPCHAIN_ID", APPCHAIN_ID);
 console.log("RELAYER_PRIVATE_KEY", RELAYER_PRIVATE_KEY);
 console.log("APPCHAIN_ENDPOINT", APPCHAIN_ENDPOINT);
 console.log("NEAR_NODE_URL", NEAR_NODE_URL);
 console.log("NEAR_WALLET_URL", NEAR_WALLET_URL);
 console.log("NEAR_HELPER_URL", NEAR_HELPER_URL);
+
+if (!APPCHAIN_ID || !RELAYER_PRIVATE_KEY || !APPCHAIN_ENDPOINT) {
+  console.log('[EXIT] Missing parameters!');
+  process.exit(0);
+}
 
 async function init() {
   const wsProvider = new WsProvider(APPCHAIN_ENDPOINT);
@@ -57,7 +63,7 @@ async function unlockOnNear(
     contractId: relayId,
     methodName: "unlock_token",
     args: {
-      appchain_id,
+      APPCHAIN_ID,
       token_id: "usdc.testnet",
       sender,
       receiver_id,
