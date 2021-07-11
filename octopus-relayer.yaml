@@ -1,15 +1,15 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: octopus-relayer-barnacle
+  name: barnacle-relayer
 spec:
   selector:
     matchLabels:
-      app: relayer
+      app: barnacle-relayer
   template:
     metadata:
       labels:
-        app: relayer
+        app: barnacle-relayer
     spec:
       containers:
       - name: relayer
