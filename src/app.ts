@@ -63,7 +63,7 @@ async function unlockOnNear(
     contractId: relayId,
     methodName: "unlock_token",
     args: {
-      APPCHAIN_ID,
+      appchain_id:APPCHAIN_ID,
       token_id: "usdc.testnet",
       sender,
       receiver_id,
