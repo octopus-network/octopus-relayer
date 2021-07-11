@@ -27,4 +27,10 @@ export default {
       LockToken: "(LockEvent)",
     },
   },
+  ObservationPayload: {
+    public: "[u8; 30]",
+    block_number: "BlockNumber",
+    fact_sequence: "u64",
+    observation: "Observation<AccountId>"
+  }
 };

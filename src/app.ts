@@ -6,8 +6,9 @@ import { decodeAddress, encodeAddress } from "@polkadot/keyring";
 
 import types from "./types";
 
-const appchain_id = "testchain";
+const appchain_id = "easydeal-demo";
 const relayId = "dev-oct-relay.testnet";
+
 const DEFAULT_GAS = new BN("300000000000000");
 const {
   RELAYER_PRIVATE_KEY,
@@ -31,6 +32,7 @@ async function init() {
   });
 
   const keyPair = utils.KeyPair.fromString(RELAYER_PRIVATE_KEY as string);
+
   const keyStore = new keyStores.InMemoryKeyStore();
   keyStore.setKey("testnet", "test-relayer.testnet", keyPair);
 
@@ -51,18 +53,19 @@ async function unlockOnNear(
   receiver_id: string,
   amount: string
 ) {
-  const result = await account.functionCall(
-    relayId,
-    "unlock_token",
-    {
+  const result = await account.functionCall({
+    contractId: relayId,
+    methodName: "unlock_token",
+    args: {
       appchain_id,
       token_id: "usdc.testnet",
       sender,
       receiver_id,
       amount: amount,
     },
-    DEFAULT_GAS
-  );
+    gas: DEFAULT_GAS,
+    attachedDeposit: new BN("1250000000000000000000")
+  });
   console.log(result);
 }
 
