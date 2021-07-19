@@ -1,10 +1,12 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
-// import { DigestItem } from "@polkadot/types/interfaces";
+import { Header } from "@polkadot/types/interfaces";
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
 import { decodeAddress, encodeAddress } from "@polkadot/keyring";
 
 import types from "./types";
+import { dbRunAsync, dbAllAsync, initDb } from "./db";
+import { RawProof, Proof } from "./interfaces";
 
 const relayId = "dev-oct-relay.testnet";
 
@@ -26,11 +28,12 @@ console.log("NEAR_WALLET_URL", NEAR_WALLET_URL);
 console.log("NEAR_HELPER_URL", NEAR_HELPER_URL);
 
 if (!APPCHAIN_ID || !RELAYER_PRIVATE_KEY || !APPCHAIN_ENDPOINT) {
-  console.log('[EXIT] Missing parameters!');
+  console.log("[EXIT] Missing parameters!");
   process.exit(0);
 }
 
 async function init() {
+  initDb();
   const wsProvider = new WsProvider(APPCHAIN_ENDPOINT);
   const appchain = await ApiPromise.create({
     provider: wsProvider,
@@ -63,14 +66,14 @@ async function unlockOnNear(
     contractId: relayId,
     methodName: "unlock_token",
     args: {
-      appchain_id:APPCHAIN_ID,
+      appchain_id: APPCHAIN_ID,
       token_id: "usdc.testnet",
       sender,
       receiver_id,
       amount: amount,
     },
     gas: DEFAULT_GAS,
-    attachedDeposit: new BN("1250000000000000000000")
+    attachedDeposit: new BN("1250000000000000000000"),
   });
   console.log(result);
 }
@@ -97,8 +100,10 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
     });
   });
 
-  appchain.rpc.chain.subscribeFinalizedHeads((header) => {
+  appchain.rpc.chain.subscribeFinalizedHeads(async (header) => {
     // console.log("new finalized header: " + header);
+
+    // Find the commitment to store it.
     header.digest.logs.forEach(async (log) => {
       if (log.isOther) {
         const commitment = log.asOther.toString();
@@ -111,9 +116,51 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
           "ascii"
         );
         console.log("messages", messages);
+        await pushProofQueue(
+          header.number.toNumber(),
+          JSON.stringify(header),
+          data.toString()
+        );
+      }
+    });
+
+    // handle poofs
+    const proofQueue = await getProofQueue();
+    proofQueue.forEach((proof) => {
+      if (header.number.toNumber() === proof.height + 1) {
+        console.log("handle poof", proof);
+        // let leaf_proof = get_leaf_poof(h.height);
+        // let mmr_root = get_mmr_root(h.height);
+        // send_unlock_tx(m, h, leaf_proof, mmr_root);
+        removeProofQueue(proof.height);
       }
     });
   });
+}
+
+async function pushProofQueue(
+  height: number,
+  header: String,
+  encoded_message: String
+): Promise<any> {
+  console.log("new proof height", height);
+  return await dbRunAsync(
+    "insert into proof_queue(height, header, encoded_message) values(?, ?, ?)",
+    [height, header, encoded_message]
+  );
+}
+
+async function getProofQueue(): Promise<Proof[]> {
+  const rawQueue: RawProof[] = await dbAllAsync("select * from proof_queue");
+  return rawQueue.map(({ height, header, encoded_message }) => ({
+    height,
+    header: JSON.parse(header),
+    encoded_message,
+  }));
+}
+
+async function removeProofQueue(height: number) {
+  return await dbRunAsync(`delete from proof_queue where height = ${height}`);
 }
 
 async function get_offchain_data_for_commitment(
