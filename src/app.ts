@@ -8,11 +8,14 @@ import types from "./types";
 import { dbRunAsync, dbAllAsync, initDb } from "./db";
 import { RawProof, Proof } from "./interfaces";
 
-const relayId = "dev-oct-relay.testnet";
+const relayId = 'dev-oct-relay.testnet';
 
-const DEFAULT_GAS = new BN("300000000000000");
+const DEFAULT_GAS = new BN('300000000000000');
+const MINIMUM_DEPOSIT = new BN('1250000000000000000000');
+
 const {
   APPCHAIN_ID,
+  APPCHAIN_TOKEN_ID,
   RELAYER_PRIVATE_KEY,
   APPCHAIN_ENDPOINT,
   NEAR_NODE_URL,
@@ -21,13 +24,14 @@ const {
 } = process.env;
 
 console.log("APPCHAIN_ID", APPCHAIN_ID);
+console.log("APPCHAIN_TOKEN_ID", APPCHAIN_TOKEN_ID);
 console.log("RELAYER_PRIVATE_KEY", RELAYER_PRIVATE_KEY);
 console.log("APPCHAIN_ENDPOINT", APPCHAIN_ENDPOINT);
 console.log("NEAR_NODE_URL", NEAR_NODE_URL);
 console.log("NEAR_WALLET_URL", NEAR_WALLET_URL);
 console.log("NEAR_HELPER_URL", NEAR_HELPER_URL);
 
-if (!APPCHAIN_ID || !RELAYER_PRIVATE_KEY || !APPCHAIN_ENDPOINT) {
+if (!APPCHAIN_ID || !APPCHAIN_TOKEN_ID || !RELAYER_PRIVATE_KEY || !APPCHAIN_ENDPOINT) {
   console.log("[EXIT] Missing parameters!");
   process.exit(0);
 }
@@ -57,24 +61,36 @@ async function init() {
 }
 
 async function unlockOnNear(
+  assetId: string,
   account: Account,
   sender: string,
   receiver_id: string,
   amount: string
 ) {
+  console.log('unlock on near:', assetId, sender, receiver_id, amount);
+  
+  const contractId = assetId ? relayId : APPCHAIN_TOKEN_ID as string;
+  const methodName = assetId ? 'unlock_token' : 'mint';
+
+  const args = assetId ? {
+    appchain_id: APPCHAIN_ID,
+    token_id: 'usdc.testnet',
+    sender,
+    receiver_id,
+    amount: amount,
+  } : {
+    account_id: receiver_id,
+    amount
+  }
+  
   const result = await account.functionCall({
-    contractId: relayId,
-    methodName: "unlock_token",
-    args: {
-      appchain_id: APPCHAIN_ID,
-      token_id: "usdc.testnet",
-      sender,
-      receiver_id,
-      amount: amount,
-    },
+    contractId,
+    methodName,
+    args,
     gas: DEFAULT_GAS,
-    attachedDeposit: new BN("1250000000000000000000"),
+    attachedDeposit: MINIMUM_DEPOSIT,
   });
+
   console.log(result);
 }
 
@@ -85,17 +101,30 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
       // Extract the phase, event and the event types
       const { event, phase } = record;
       const types = event.typeDef;
-
-      if (event.section == "octopusAppchain" && event.method == "Burned") {
+      
+      if (event.section == "octopusAppchain") {
         const { data } = event;
-        const assetId = data[0];
-        const sender = Buffer.from(decodeAddress(data[1] as any)).toString(
-          "hex"
-        ) as string;
-        const receiver_id = Buffer.from(data[2] as any, "hex").toString("utf8");
-        const amount = data[3].toString();
+        if (event.method == "Burned") {
+          const assetId = data[0].toString();
+          const sender = Buffer.from(decodeAddress(data[1] as any)).toString(
+            "hex"
+          ) as string;
+          const receiver_id = Buffer.from(data[2] as any, "hex").toString("utf8");
+          const amount = data[3].toString();
 
-        unlockOnNear(account, sender, receiver_id, amount);
+          unlockOnNear(assetId, account, sender, receiver_id, amount);
+        } else if (event.method == "Locked") {
+          const sender = Buffer.from(decodeAddress(data[0] as any)).toString(
+            "hex"
+          ) as string;
+          
+          const receiver_id = Buffer.from(data[1] as any, "hex").toString("utf8");
+          const amount = data[2].toString();
+
+          unlockOnNear('', account, sender, receiver_id, amount);
+
+        }
+        
       }
     });
   });
