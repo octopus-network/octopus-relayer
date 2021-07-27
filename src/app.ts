@@ -6,7 +6,7 @@ import { decodeAddress, encodeAddress } from "@polkadot/keyring";
 
 import types from "./types";
 import { dbRunAsync, dbAllAsync, initDb } from "./db";
-import { RawProof, Proof } from "./interfaces";
+import { Commitment } from "./interfaces";
 
 const relayId = 'dev-oct-relay.testnet';
 
@@ -68,7 +68,7 @@ async function unlockOnNear(
   amount: string
 ) {
   console.log('unlock on near:', assetId, sender, receiver_id, amount);
-  
+
   const contractId = assetId ? relayId : APPCHAIN_TOKEN_ID as string;
   const methodName = assetId ? 'unlock_token' : 'mint';
 
@@ -82,7 +82,7 @@ async function unlockOnNear(
     account_id: receiver_id,
     amount
   }
-  
+
   const result = await account.functionCall({
     contractId,
     methodName,
@@ -101,7 +101,7 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
       // Extract the phase, event and the event types
       const { event, phase } = record;
       const types = event.typeDef;
-      
+
       if (event.section == "octopusAppchain") {
         const { data } = event;
         if (event.method == "Burned") {
@@ -117,14 +117,14 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
           const sender = Buffer.from(decodeAddress(data[0] as any)).toString(
             "hex"
           ) as string;
-          
+
           const receiver_id = Buffer.from(data[1] as any, "hex").toString("utf8");
           const amount = data[2].toString();
 
           unlockOnNear('', account, sender, receiver_id, amount);
 
         }
-        
+
       }
     });
   });
@@ -136,60 +136,55 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
     header.digest.logs.forEach(async (log) => {
       if (log.isOther) {
         const commitment = log.asOther.toString();
-        const data = await get_offchain_data_for_commitment(
-          appchain,
-          commitment
-        );
-        console.log("data", data);
-        const messages = Buffer.from(data.toString().slice(2), "hex").toString(
-          "ascii"
-        );
-        console.log("messages", messages);
-        await pushProofQueue(
+        await storeCommitment(
           header.number.toNumber(),
-          JSON.stringify(header),
-          data.toString()
+          commitment
         );
       }
     });
 
-    // handle poofs
-    const proofQueue = await getProofQueue();
-    proofQueue.forEach((proof) => {
-      if (header.number.toNumber() === proof.height + 1) {
-        console.log("handle poof", proof);
-        // let leaf_proof = get_leaf_poof(h.height);
-        // let mmr_root = get_mmr_root(h.height);
-        // send_unlock_tx(m, h, leaf_proof, mmr_root);
-        removeProofQueue(proof.height);
-      }
+    // relay cross-chain messages
+    const commitments = await getCommitments(header.number.toNumber() - 1);
+    commitments.forEach(async (commitment) => {
+      console.log("handle commitment", commitment);
+      const data = await get_offchain_data_for_commitment(
+        appchain,
+        commitment.commitment
+      );
+      console.log("data", data);
+      const messages = Buffer.from(data.toString().slice(2), "hex").toString(
+        "ascii"
+      );
+      console.log("messages", messages);
+      // let leaf_proof = get_leaf_poof(h.height);
+      // let mmr_root = get_mmr_root(h.height);
+      // send_unlock_tx(m, h, leaf_proof, mmr_root);
+      markAsSent(commitment.height);
     });
   });
 }
 
-async function pushProofQueue(
+async function storeCommitment(
   height: number,
-  header: String,
-  encoded_message: String
+  commitment: String,
 ): Promise<any> {
-  console.log("new proof height", height);
+  console.log("new commitment height", height);
   return await dbRunAsync(
-    "insert into proof_queue(height, header, encoded_message) values(?, ?, ?)",
-    [height, header, encoded_message]
+    "INSERT INTO commitments(height, commitment, created_at, updated_at, status) values(?, ?, datetime('now'), datetime('now'), 0)",
+    [height, commitment]
   );
 }
 
-async function getProofQueue(): Promise<Proof[]> {
-  const rawQueue: RawProof[] = await dbAllAsync("select * from proof_queue");
-  return rawQueue.map(({ height, header, encoded_message }) => ({
+async function getCommitments(height: number): Promise<Commitment[]> {
+  const commitments: Commitment[] = await dbAllAsync("SELECT * FROM commitments WHERE height <= ? AND status == 0", [height]);
+  return commitments.map(({ height, commitment }) => ({
     height,
-    header: JSON.parse(header),
-    encoded_message,
+    commitment,
   }));
 }
 
-async function removeProofQueue(height: number) {
-  return await dbRunAsync(`delete from proof_queue where height = ${height}`);
+async function markAsSent(height: number) {
+  return await dbRunAsync(`UPDATE commitments SET status = 1 WHERE height = ${height}`);
 }
 
 async function get_offchain_data_for_commitment(
