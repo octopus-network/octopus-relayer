@@ -1,5 +1,5 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
-import { Header } from "@polkadot/types/interfaces";
+import { Header, Event } from "@polkadot/types/interfaces";
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
 import { decodeAddress, encodeAddress } from "@polkadot/keyring";
@@ -95,43 +95,7 @@ async function unlockOnNear(
 }
 
 async function listenEvents(appchain: ApiPromise, account: Account) {
-  appchain.query.system.events((events) => {
-    // Loop through the Vec<EventRecord>
-    events.forEach((record) => {
-      // Extract the phase, event and the event types
-      const { event, phase } = record;
-      const types = event.typeDef;
-
-      if (event.section == "octopusAppchain") {
-        const { data } = event;
-        if (event.method == "Burned") {
-          const assetId = data[0].toString();
-          const sender = Buffer.from(decodeAddress(data[1] as any)).toString(
-            "hex"
-          ) as string;
-          const receiver_id = Buffer.from(data[2] as any, "hex").toString("utf8");
-          const amount = data[3].toString();
-
-          unlockOnNear(assetId, account, sender, receiver_id, amount);
-        } else if (event.method == "Locked") {
-          const sender = Buffer.from(decodeAddress(data[0] as any)).toString(
-            "hex"
-          ) as string;
-
-          const receiver_id = Buffer.from(data[1] as any, "hex").toString("utf8");
-          const amount = data[2].toString();
-
-          unlockOnNear('', account, sender, receiver_id, amount);
-
-        }
-
-      }
-    });
-  });
-
   appchain.rpc.chain.subscribeFinalizedHeads(async (header) => {
-    // console.log("new finalized header: " + header);
-
     // Find the commitment to store it.
     header.digest.logs.forEach(async (log) => {
       if (log.isOther) {
@@ -156,9 +120,19 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
         "ascii"
       );
       console.log("messages", messages);
-      // let leaf_proof = get_leaf_poof(h.height);
-      // let mmr_root = get_mmr_root(h.height);
-      // send_unlock_tx(m, h, leaf_proof, mmr_root);
+      const leafIndex = commitment.height;
+
+      const proof = await appchain.rpc.mmr.generateProof(
+        leafIndex,
+        header.hash
+      );
+      console.log("proof:", proof);
+
+      const rootHash = await appchain.query.mmr.rootHash(header.hash);
+      console.log("rootHash:", rootHash);
+      // TODO
+      // let header = await appchain.get_header();
+      // send_unlock_tx(messages, header, leaf_proof, mmr_root);
       markAsSent(commitment.height);
     });
   });
@@ -191,6 +165,7 @@ async function get_offchain_data_for_commitment(
   appchain: ApiPromise,
   commitment: string
 ) {
+  console.log("get_offchain_data_for_commitment");
   const prefixBuffer = Buffer.from("commitment", "utf8");
   const key = "0x" + prefixBuffer.toString("hex") + commitment.slice(2);
   const data = (
