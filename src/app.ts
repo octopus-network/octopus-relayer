@@ -1,17 +1,17 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
-import { Header, Event } from "@polkadot/types/interfaces";
+import { Event, Hash } from "@polkadot/types/interfaces";
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
 import { decodeAddress, encodeAddress } from "@polkadot/keyring";
 
 import types from "./types";
 import { dbRunAsync, dbAllAsync, initDb } from "./db";
-import { Commitment } from "./interfaces";
+import { Commitment, Proof, HeaderPartial } from "./interfaces";
 
-const relayId = 'dev-oct-relay.testnet';
+const relayId = "dev-oct-relay.testnet";
 
-const DEFAULT_GAS = new BN('300000000000000');
-const MINIMUM_DEPOSIT = new BN('1250000000000000000000');
+const DEFAULT_GAS = new BN("300000000000000");
+const MINIMUM_DEPOSIT = new BN("1250000000000000000000");
 
 const {
   APPCHAIN_ID,
@@ -31,7 +31,12 @@ console.log("NEAR_NODE_URL", NEAR_NODE_URL);
 console.log("NEAR_WALLET_URL", NEAR_WALLET_URL);
 console.log("NEAR_HELPER_URL", NEAR_HELPER_URL);
 
-if (!APPCHAIN_ID || !APPCHAIN_TOKEN_ID || !RELAYER_PRIVATE_KEY || !APPCHAIN_ENDPOINT) {
+if (
+  !APPCHAIN_ID ||
+  !APPCHAIN_TOKEN_ID ||
+  !RELAYER_PRIVATE_KEY ||
+  !APPCHAIN_ENDPOINT
+) {
   console.log("[EXIT] Missing parameters!");
   process.exit(0);
 }
@@ -60,87 +65,88 @@ async function init() {
   return { appchain, account };
 }
 
-async function unlockOnNear(
-  assetId: string,
-  account: Account,
-  sender: string,
-  receiver_id: string,
-  amount: string
-) {
-  console.log('unlock on near:', assetId, sender, receiver_id, amount);
-
-  const contractId = assetId ? relayId : APPCHAIN_TOKEN_ID as string;
-  const methodName = assetId ? 'unlock_token' : 'mint';
-
-  const args = assetId ? {
-    appchain_id: APPCHAIN_ID,
-    token_id: 'usdc.testnet',
-    sender,
-    receiver_id,
-    amount: amount,
-  } : {
-    account_id: receiver_id,
-    amount
-  }
-
-  const result = await account.functionCall({
-    contractId,
-    methodName,
-    args,
-    gas: DEFAULT_GAS,
-    attachedDeposit: MINIMUM_DEPOSIT,
-  });
-
-  console.log(result);
-}
-
 async function listenEvents(appchain: ApiPromise, account: Account) {
   appchain.rpc.chain.subscribeFinalizedHeads(async (header) => {
     // Find the commitment to store it.
     header.digest.logs.forEach(async (log) => {
       if (log.isOther) {
         const commitment = log.asOther.toString();
-        await storeCommitment(
-          header.number.toNumber(),
-          commitment
-        );
+        await storeCommitment(header.number.toNumber(), commitment);
       }
     });
 
     // relay cross-chain messages
-    const commitments = await getCommitments(header.number.toNumber() - 1);
+    const commitments = await getUnmarkedCommitments(
+      header.number.toNumber() - 1
+    );
     commitments.forEach(async (commitment) => {
-      console.log("handle commitment", commitment);
-      const data = await get_offchain_data_for_commitment(
+      const data = await getOffchainDataForCommitment(
         appchain,
         commitment.commitment
       );
-      console.log("data", data);
-      const messages = Buffer.from(data.toString().slice(2), "hex").toString(
-        "ascii"
-      );
-      console.log("messages", messages);
+      const dataBuffer = Buffer.from(data.toString().slice(2), "hex");
+      console.log("decoded messages", dataBuffer.toString());
+      const encoded_messages = Array.from(dataBuffer);
       const leafIndex = commitment.height;
 
-      const proof = await appchain.rpc.mmr.generateProof(
+      const rawProof = await appchain.rpc.mmr.generateProof(
         leafIndex,
         header.hash
       );
-      console.log("proof:", proof);
+      const proof: Proof = {
+        leaf_index: leafIndex,
+        leaf_count: header.number.toNumber(),
+        items: Array.from(
+          Buffer.from(rawProof.proof.toString().slice(2), "hex")
+        ),
+      };
 
-      const rootHash = await appchain.query.mmr.rootHash(header.hash);
-      console.log("rootHash:", rootHash);
-      // TODO
-      // let header = await appchain.get_header();
-      // send_unlock_tx(messages, header, leaf_proof, mmr_root);
+      const mmrRoot = await appchain.query.mmr.rootHash.at(header.hash);
+
+      const cBlockHash = await appchain.rpc.chain.getBlockHash(
+        commitment.height
+      );
+      const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
+
+      const header_partial: HeaderPartial = {
+        parent_hash: cHeader.parentHash,
+        number: cHeader.number.toNumber(),
+        state_root: cHeader.stateRoot,
+        extrinsics_root: cHeader.extrinsicsRoot,
+        digest: cHeader.digest,
+      };
+
+      await verify(account, encoded_messages, header_partial, proof, mmrRoot);
       markAsSent(commitment.height);
     });
   });
 }
 
+async function verify(
+  account: Account,
+  encoded_messages: Number[],
+  header_partial: HeaderPartial,
+  proof: Proof,
+  mmrRoot: Hash
+) {
+  const result = await account.functionCall({
+    contractId: APPCHAIN_ID as string,
+    methodName: "verify",
+    args: {
+      encoded_messages,
+      header_partial,
+      proof,
+      mmrRoot,
+    },
+    gas: DEFAULT_GAS,
+    attachedDeposit: MINIMUM_DEPOSIT,
+  });
+  console.log("result", result);
+}
+
 async function storeCommitment(
   height: number,
-  commitment: String,
+  commitment: String
 ): Promise<any> {
   console.log("new commitment height", height);
   return await dbRunAsync(
@@ -149,8 +155,11 @@ async function storeCommitment(
   );
 }
 
-async function getCommitments(height: number): Promise<Commitment[]> {
-  const commitments: Commitment[] = await dbAllAsync("SELECT * FROM commitments WHERE height <= ? AND status == 0", [height]);
+async function getUnmarkedCommitments(height: number): Promise<Commitment[]> {
+  const commitments: Commitment[] = await dbAllAsync(
+    "SELECT * FROM commitments WHERE height <= ? AND status == 0",
+    [height]
+  );
   return commitments.map(({ height, commitment }) => ({
     height,
     commitment,
@@ -158,14 +167,16 @@ async function getCommitments(height: number): Promise<Commitment[]> {
 }
 
 async function markAsSent(height: number) {
-  return await dbRunAsync(`UPDATE commitments SET status = 1 WHERE height = ${height}`);
+  return await dbRunAsync(
+    `UPDATE commitments SET status = 1, updated_at = datetime('now') WHERE height = ${height}`
+  );
 }
 
-async function get_offchain_data_for_commitment(
+async function getOffchainDataForCommitment(
   appchain: ApiPromise,
   commitment: string
 ) {
-  console.log("get_offchain_data_for_commitment");
+  console.log("getOffchainDataForCommitment");
   const prefixBuffer = Buffer.from("commitment", "utf8");
   const key = "0x" + prefixBuffer.toString("hex") + commitment.slice(2);
   const data = (
