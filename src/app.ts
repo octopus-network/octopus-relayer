@@ -15,7 +15,7 @@ const MINIMUM_DEPOSIT = new BN("1250000000000000000000");
 
 const {
   APPCHAIN_ID,
-  APPCHAIN_TOKEN_ID,
+  RELAY_CONTRACT_ID,
   RELAYER_PRIVATE_KEY,
   APPCHAIN_ENDPOINT,
   NEAR_NODE_URL,
@@ -24,7 +24,7 @@ const {
 } = process.env;
 
 console.log("APPCHAIN_ID", APPCHAIN_ID);
-console.log("APPCHAIN_TOKEN_ID", APPCHAIN_TOKEN_ID);
+console.log("RELAY_CONTRACT_ID", RELAY_CONTRACT_ID);
 console.log("RELAYER_PRIVATE_KEY", RELAYER_PRIVATE_KEY);
 console.log("APPCHAIN_ENDPOINT", APPCHAIN_ENDPOINT);
 console.log("NEAR_NODE_URL", NEAR_NODE_URL);
@@ -33,7 +33,7 @@ console.log("NEAR_HELPER_URL", NEAR_HELPER_URL);
 
 if (
   !APPCHAIN_ID ||
-  !APPCHAIN_TOKEN_ID ||
+  !RELAY_CONTRACT_ID ||
   !RELAYER_PRIVATE_KEY ||
   !APPCHAIN_ENDPOINT
 ) {
@@ -84,6 +84,7 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
         appchain,
         commitment.commitment
       );
+      console.log("commitment", commitment.commitment);
       const dataBuffer = Buffer.from(data.toString().slice(2), "hex");
       console.log("decoded messages", dataBuffer.toString());
       const encoded_messages = Array.from(dataBuffer);
@@ -93,7 +94,7 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
         leafIndex,
         header.hash
       );
-      const proof: Proof = {
+      const leaf_proof: Proof = {
         leaf_index: leafIndex,
         leaf_count: header.number.toNumber(),
         items: Array.from(
@@ -101,7 +102,7 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
         ),
       };
 
-      const mmrRoot = await appchain.query.mmr.rootHash.at(header.hash);
+      const mmr_root = await appchain.query.mmr.rootHash.at(header.hash);
 
       const cBlockHash = await appchain.rpc.chain.getBlockHash(
         commitment.height
@@ -116,30 +117,41 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
         digest: cHeader.digest,
       };
 
-      await verify(account, encoded_messages, header_partial, proof, mmrRoot);
+      await relay(
+        account,
+        encoded_messages,
+        header_partial,
+        leaf_proof,
+        mmr_root
+      );
       markAsSent(commitment.height);
     });
   });
 }
 
-async function verify(
+async function relay(
   account: Account,
+  // decoded_messages:
   encoded_messages: Number[],
   header_partial: HeaderPartial,
-  proof: Proof,
-  mmrRoot: Hash
+  leaf_proof: Proof,
+  mmr_root: Hash
 ) {
+  // mock for verification
+  const args = {
+    appchain_id: APPCHAIN_ID,
+    encoded_messages,
+    header_partial: [0],
+    leaf_proof: [0],
+    mmr_root: [0],
+  };
+  console.log("args", JSON.stringify(args));
   const result = await account.functionCall({
-    contractId: APPCHAIN_ID as string,
-    methodName: "verify",
-    args: {
-      encoded_messages,
-      header_partial,
-      proof,
-      mmrRoot,
-    },
+    contractId: RELAY_CONTRACT_ID as string,
+    methodName: "relay",
+    args,
     gas: DEFAULT_GAS,
-    attachedDeposit: MINIMUM_DEPOSIT,
+    attachedDeposit: new BN("0"),
   });
   console.log("result", result);
 }

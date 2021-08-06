@@ -4,7 +4,7 @@
 
 ```
 export APPCHAIN_ID=barnacle-ng
-export APPCHAIN_TOKEN_ID=dev-oct-relay.testnet
+export RELAY_CONTRACT_ID=dev-oct-relay.testnet
 export RELAYER_PRIVATE_KEY=ed25519:...(Your private key)
 export APPCHAIN_ENDPOINT=wss://gateway.testnet.octopus.network/barnacle-ng/e54233369e77663b60bc8d21b5fb4875
 export NEAR_NODE_URL="https://rpc.testnet.near.org"
