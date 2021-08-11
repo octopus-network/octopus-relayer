@@ -4,6 +4,7 @@ const upsert = require("sqlite3-upsert");
 const db = new sqlite3.Database("relayer.db");
 export const dbRunAsync = promisify(db.run.bind(db));
 export const dbAllAsync = promisify(db.all.bind(db));
+export const dbGetAsync = promisify(db.get.bind(db));
 
 export function initDb() {
   db.run(

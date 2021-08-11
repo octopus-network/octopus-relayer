@@ -5,7 +5,7 @@ import BN from "bn.js";
 import { decodeAddress, encodeAddress } from "@polkadot/keyring";
 
 import types from "./types";
-import { dbRunAsync, dbAllAsync, initDb } from "./db";
+import { dbRunAsync, dbAllAsync, dbGetAsync, initDb } from "./db";
 import { Commitment, Proof, HeaderPartial } from "./interfaces";
 
 const relayId = "dev-oct-relay.testnet";
@@ -76,10 +76,12 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
     });
 
     // relay cross-chain messages
-    const commitments = await getUnmarkedCommitments(
-      header.number.toNumber() - 1
+    const commitment = await getLastCommitment(
+      header.number.toNumber()
     );
-    commitments.forEach(async (commitment) => {
+
+    // TODO: ugly
+    if (commitment) {
       const data = await getOffchainDataForCommitment(
         appchain,
         commitment.commitment
@@ -125,7 +127,7 @@ async function listenEvents(appchain: ApiPromise, account: Account) {
         mmr_root
       );
       markAsSent(commitment.height);
-    });
+    }
   });
 }
 
@@ -178,6 +180,14 @@ async function getUnmarkedCommitments(height: number): Promise<Commitment[]> {
   }));
 }
 
+async function getLastCommitment(currentHeight: number): Promise<Commitment> {
+  const commitment: Commitment = await dbGetAsync(
+    "SELECT * FROM commitments WHERE height == ? AND status == 0",
+    [currentHeight - 1]
+  );
+  return commitment;
+}
+
 async function markAsSent(height: number) {
   return await dbRunAsync(
     `UPDATE commitments SET status = 1, updated_at = datetime('now') WHERE height = ${height}`
@@ -199,6 +209,13 @@ async function getOffchainDataForCommitment(
 
 async function start() {
   const { appchain, account } = await init();
+  // TODO: retry failed commitments here
+
+  // const commitments = await getUnmarkedCommitments(
+  //   header.number.toNumber() - 1
+  // );
+  // commitments.forEach(async (commitment) => {
+  // });
   listenEvents(appchain, account);
 }
 
