@@ -10,4 +10,16 @@ export function initDb() {
   db.run(
     "CREATE TABLE IF NOT EXISTS commitments(height INTEGER, commitment TEXT, created_at TEXT, updated_at TEXT, status INTEGER)"
   );
+  // type == 1 means for commitments
+  db.run(
+    "CREATE TABLE IF NOT EXISTS last_synced_blocks(height INTEGER, type INTEGER)"
+  );
 }
+
+export const upsertLastSyncedBlocks = promisify(
+  upsert({
+    table: "last_synced_blocks",
+    key: "type",
+    db: db,
+  })
+);
