@@ -1,32 +1,41 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
-import { Event, Hash } from "@polkadot/types/interfaces";
+import { Event, Hash, Header } from "@polkadot/types/interfaces";
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
 import { decodeAddress, encodeAddress } from "@polkadot/keyring";
 
 import types from "./types";
-import { dbRunAsync, dbAllAsync, dbGetAsync, initDb } from "./db";
-import { Commitment, Proof, HeaderPartial } from "./interfaces";
+import {
+  dbRunAsync,
+  dbAllAsync,
+  dbGetAsync,
+  initDb,
+  upsertLastSyncedBlocks,
+} from "./db";
+import { Commitment, Proof, HeaderPartial, SYNCEDBLOCK } from "./interfaces";
 
 const relayId = "dev-oct-relay.testnet";
-
 const DEFAULT_GAS = new BN("300000000000000");
 const MINIMUM_DEPOSIT = new BN("1250000000000000000000");
+const BLOCK_SYNC_SIZE = 20;
 
 const {
   APPCHAIN_ID,
   RELAY_CONTRACT_ID,
   RELAYER_PRIVATE_KEY,
   APPCHAIN_ENDPOINT,
+  START_BLOCK_HEIGHT,
   NEAR_NODE_URL,
   NEAR_WALLET_URL,
   NEAR_HELPER_URL,
 } = process.env;
+let latestFinalizedHeight = 0;
 
 console.log("APPCHAIN_ID", APPCHAIN_ID);
 console.log("RELAY_CONTRACT_ID", RELAY_CONTRACT_ID);
 console.log("RELAYER_PRIVATE_KEY", RELAYER_PRIVATE_KEY);
 console.log("APPCHAIN_ENDPOINT", APPCHAIN_ENDPOINT);
+console.log("START_BLOCK_HEIGHT", START_BLOCK_HEIGHT);
 console.log("NEAR_NODE_URL", NEAR_NODE_URL);
 console.log("NEAR_WALLET_URL", NEAR_WALLET_URL);
 console.log("NEAR_HELPER_URL", NEAR_HELPER_URL);
@@ -35,7 +44,8 @@ if (
   !APPCHAIN_ID ||
   !RELAY_CONTRACT_ID ||
   !RELAYER_PRIVATE_KEY ||
-  !APPCHAIN_ENDPOINT
+  !APPCHAIN_ENDPOINT ||
+  !START_BLOCK_HEIGHT
 ) {
   console.log("[EXIT] Missing parameters!");
   process.exit(0);
@@ -65,69 +75,131 @@ async function init() {
   return { appchain, account };
 }
 
-async function listenEvents(appchain: ApiPromise, account: Account) {
-  appchain.rpc.chain.subscribeFinalizedHeads(async (header) => {
+async function syncBlocks(appchain: ApiPromise) {
+  const nextHeight = await getNextHeight();
+  if (nextHeight > latestFinalizedHeight) {
+    syncBlocks(appchain);
+  } else {
+    console.log("nextHeight", nextHeight);
+    if (nextHeight <= latestFinalizedHeight - BLOCK_SYNC_SIZE) {
+      const promises = new Array(BLOCK_SYNC_SIZE)
+        .fill(1)
+        .map(async (_, index) => {
+          await syncBlock(appchain, nextHeight + index);
+        });
+      Promise.all(promises).then(
+        async () => {
+          try {
+            await updateSyncedBlock(nextHeight + BLOCK_SYNC_SIZE - 1);
+          } catch (e) {
+            console.error("updateSyncedBlock error", e);
+          }
+          syncBlocks(appchain);
+        },
+        (e) => {
+          console.error("syncBlocks error", e);
+          syncBlocks(appchain);
+        }
+      );
+    } else {
+      try {
+        await syncBlock(appchain, nextHeight);
+        await updateSyncedBlock(nextHeight);
+      } catch (e) {
+        console.error("syncBlocks error", e);
+      }
+      syncBlocks(appchain);
+    }
+  }
+}
+
+async function syncBlock(appchain: ApiPromise, nextHeight: number) {
+  if (nextHeight <= latestFinalizedHeight) {
+    const nextBlockHash = await appchain.rpc.chain.getBlockHash(nextHeight);
+    const header = await appchain.rpc.chain.getHeader(nextBlockHash);
     // Find the commitment to store it.
     header.digest.logs.forEach(async (log) => {
       if (log.isOther) {
         const commitment = log.asOther.toString();
+        console.log("storeCommitment", commitment);
         await storeCommitment(header.number.toNumber(), commitment);
       }
     });
+  }
+}
 
-    // relay cross-chain messages
-    const commitment = await getLastCommitment(
-      header.number.toNumber()
-    );
-
-    // TODO: ugly
-    if (commitment) {
-      const data = await getOffchainDataForCommitment(
-        appchain,
-        commitment.commitment
+async function handleCommitments(appchain: ApiPromise, account: Account) {
+  const nextHeight = await getNextHeight();
+  const currentHeight = nextHeight - 1;
+  const unMarkedCommitments = await getUnmarkedCommitments(currentHeight);
+  if (unMarkedCommitments.length > 0) {
+    const currentBlockHash = await appchain.rpc.chain.getBlockHash(nextHeight);
+    const header = await appchain.rpc.chain.getHeader(currentBlockHash);
+    unMarkedCommitments;
+    // Use try-catch here instead of in handleCommitment for issuring the excecution order.
+    try {
+      for (let index = 0; index < unMarkedCommitments.length; index++) {
+        // Excecute by order.
+        await handleCommitment(
+          unMarkedCommitments[index],
+          appchain,
+          account,
+          header
+        );
+      }
+    } catch (e) {
+      console.error(
+        "commitments handling failed, currentHeight=",
+        currentHeight
       );
-      console.log("commitment", commitment.commitment);
-      const dataBuffer = Buffer.from(data.toString().slice(2), "hex");
-      console.log("decoded messages", dataBuffer.toString());
-      const encoded_messages = Array.from(dataBuffer);
-      const leafIndex = commitment.height;
-
-      const rawProof = await appchain.rpc.mmr.generateProof(
-        leafIndex,
-        header.hash
-      );
-      const leaf_proof: Proof = {
-        leaf_index: leafIndex,
-        leaf_count: header.number.toNumber(),
-        items: Array.from(
-          Buffer.from(rawProof.proof.toString().slice(2), "hex")
-        ),
-      };
-
-      const mmr_root = await appchain.query.mmr.rootHash.at(header.hash);
-
-      const cBlockHash = await appchain.rpc.chain.getBlockHash(
-        commitment.height
-      );
-      const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
-
-      const header_partial: HeaderPartial = {
-        parent_hash: cHeader.parentHash,
-        number: cHeader.number.toNumber(),
-        state_root: cHeader.stateRoot,
-        extrinsics_root: cHeader.extrinsicsRoot,
-        digest: cHeader.digest,
-      };
-
-      await relay(
-        account,
-        encoded_messages,
-        header_partial,
-        leaf_proof,
-        mmr_root
-      );
-      markAsSent(commitment.height);
     }
+  }
+  handleCommitments(appchain, account);
+}
+
+async function handleCommitment(
+  commitment: Commitment,
+  appchain: ApiPromise,
+  account: Account,
+  header: Header
+) {
+  const data = await getOffchainDataForCommitment(
+    appchain,
+    commitment.commitment
+  );
+  console.log("commitment", commitment.commitment);
+  const dataBuffer = Buffer.from(data.toString().slice(2), "hex");
+  console.log("decoded messages", dataBuffer.toString());
+  const encoded_messages = Array.from(dataBuffer);
+  const leafIndex = commitment.height;
+
+  const rawProof = await appchain.rpc.mmr.generateProof(leafIndex, header.hash);
+  const leaf_proof: Proof = {
+    leaf_index: leafIndex,
+    leaf_count: header.number.toNumber(),
+    items: Array.from(Buffer.from(rawProof.proof.toString().slice(2), "hex")),
+  };
+
+  const mmr_root = await appchain.query.mmr.rootHash.at(header.hash);
+
+  const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height);
+  const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
+
+  const header_partial: HeaderPartial = {
+    parent_hash: cHeader.parentHash,
+    number: cHeader.number.toNumber(),
+    state_root: cHeader.stateRoot,
+    extrinsics_root: cHeader.extrinsicsRoot,
+    digest: cHeader.digest,
+  };
+
+  await relay(account, encoded_messages, header_partial, leaf_proof, mmr_root);
+  markAsSent(commitment.height);
+}
+
+async function syncFinalizedHeights(appchain: ApiPromise) {
+  appchain.rpc.chain.subscribeFinalizedHeads(async (header) => {
+    latestFinalizedHeight = header.number.toNumber();
   });
 }
 
@@ -169,9 +241,26 @@ async function storeCommitment(
   );
 }
 
+async function updateSyncedBlock(height: number): Promise<any> {
+  return await upsertLastSyncedBlocks({ height, type: 1 });
+}
+
+async function getNextHeight(): Promise<number> {
+  const data: SYNCEDBLOCK[] = await dbAllAsync(
+    "SELECT * FROM last_synced_blocks WHERE type == ?",
+    [1]
+  );
+  if (data.length > 0) {
+    const lastSyncedBlock = data[0];
+    return lastSyncedBlock.height + 1;
+  } else {
+    return Number(START_BLOCK_HEIGHT) + 1;
+  }
+}
+
 async function getUnmarkedCommitments(height: number): Promise<Commitment[]> {
   const commitments: Commitment[] = await dbAllAsync(
-    "SELECT * FROM commitments WHERE height <= ? AND status == 0",
+    "SELECT * FROM commitments WHERE height <= ? AND status == 0 ORDER BY height",
     [height]
   );
   return commitments.map(({ height, commitment }) => ({
@@ -190,7 +279,7 @@ async function getLastCommitment(currentHeight: number): Promise<Commitment> {
 
 async function markAsSent(height: number) {
   return await dbRunAsync(
-    `UPDATE commitments SET status = 1, updated_at = datetime('now') WHERE height = ${height}`
+    `UPDATE commitments SET status = 1, updated_at = datetime('now') WHERE height == ${height}`
   );
 }
 
@@ -198,7 +287,6 @@ async function getOffchainDataForCommitment(
   appchain: ApiPromise,
   commitment: string
 ) {
-  console.log("getOffchainDataForCommitment");
   const prefixBuffer = Buffer.from("commitment", "utf8");
   const key = "0x" + prefixBuffer.toString("hex") + commitment.slice(2);
   const data = (
@@ -211,12 +299,9 @@ async function start() {
   const { appchain, account } = await init();
   // TODO: retry failed commitments here
 
-  // const commitments = await getUnmarkedCommitments(
-  //   header.number.toNumber() - 1
-  // );
-  // commitments.forEach(async (commitment) => {
-  // });
-  listenEvents(appchain, account);
+  syncBlocks(appchain);
+  handleCommitments(appchain, account);
+  syncFinalizedHeights(appchain);
 }
 
 start().catch((error) => {
