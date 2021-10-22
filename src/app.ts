@@ -21,7 +21,7 @@ const BLOCK_SYNC_SIZE = 20;
 
 const {
   APPCHAIN_ID,
-  RELAY_CONTRACT_ID,
+  ANCHOR_CONTRACT_ID,
   RELAYER_PRIVATE_KEY,
   APPCHAIN_ENDPOINT,
   START_BLOCK_HEIGHT,
@@ -32,7 +32,7 @@ const {
 let latestFinalizedHeight = 0;
 
 console.log("APPCHAIN_ID", APPCHAIN_ID);
-console.log("RELAY_CONTRACT_ID", RELAY_CONTRACT_ID);
+console.log("ANCHOR_CONTRACT_ID", ANCHOR_CONTRACT_ID);
 console.log("RELAYER_PRIVATE_KEY", RELAYER_PRIVATE_KEY);
 console.log("APPCHAIN_ENDPOINT", APPCHAIN_ENDPOINT);
 console.log("START_BLOCK_HEIGHT", START_BLOCK_HEIGHT);
@@ -42,7 +42,7 @@ console.log("NEAR_HELPER_URL", NEAR_HELPER_URL);
 
 if (
   !APPCHAIN_ID ||
-  !RELAY_CONTRACT_ID ||
+  !ANCHOR_CONTRACT_ID ||
   !RELAYER_PRIVATE_KEY ||
   !APPCHAIN_ENDPOINT ||
   !START_BLOCK_HEIGHT
@@ -169,7 +169,7 @@ async function handleCommitment(
   );
   console.log("commitment", commitment.commitment);
   const dataBuffer = Buffer.from(data.toString().slice(2), "hex");
-  console.log("decoded messages", dataBuffer.toString());
+  // console.log("decoded messages", dataBuffer.toString());
   const encoded_messages = Array.from(dataBuffer);
   const leafIndex = commitment.height;
 
@@ -193,7 +193,9 @@ async function handleCommitment(
     digest: cHeader.digest,
   };
 
-  await relay(account, encoded_messages, header_partial, leaf_proof, mmr_root);
+  console.log("the crosschain data: ", data);
+
+  // await relay(account, encoded_messages, header_partial, leaf_proof, mmr_root);
   markAsSent(commitment.height);
 }
 
@@ -221,7 +223,7 @@ async function relay(
   };
   console.log("args", JSON.stringify(args));
   const result = await account.functionCall({
-    contractId: RELAY_CONTRACT_ID as string,
+    contractId: ANCHOR_CONTRACT_ID as string,
     methodName: "relay",
     args,
     gas: DEFAULT_GAS,
