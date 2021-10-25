@@ -14,7 +14,6 @@ import {
 } from "./db";
 import { Commitment, Proof, HeaderPartial, SYNCEDBLOCK } from "./interfaces";
 
-const relayId = "dev-oct-relay.testnet";
 const DEFAULT_GAS = new BN("300000000000000");
 const MINIMUM_DEPOSIT = new BN("1250000000000000000000");
 const BLOCK_SYNC_SIZE = 20;
@@ -170,7 +169,7 @@ async function handleCommitment(
   console.log("commitment", commitment.commitment);
   const dataBuffer = Buffer.from(data.toString().slice(2), "hex");
   // console.log("decoded messages", dataBuffer.toString());
-  const encoded_messages = Array.from(dataBuffer);
+  const encoded_message = Array.from(dataBuffer);
   const leafIndex = commitment.height;
 
   const rawProof = await appchain.rpc.mmr.generateProof(leafIndex, header.hash);
@@ -195,7 +194,7 @@ async function handleCommitment(
 
   console.log("the crosschain data: ", data);
 
-  // await relay(account, encoded_messages, header_partial, leaf_proof, mmr_root);
+  await relay(account, encoded_message, header_partial, leaf_proof, mmr_root);
   markAsSent(commitment.height);
 }
 
@@ -208,23 +207,28 @@ async function syncFinalizedHeights(appchain: ApiPromise) {
 async function relay(
   account: Account,
   // decoded_messages:
-  encoded_messages: Number[],
+  encoded_message: Number[],
   header_partial: HeaderPartial,
   leaf_proof: Proof,
   mmr_root: Hash
 ) {
   // mock for verification
   const args = {
-    appchain_id: APPCHAIN_ID,
-    encoded_messages,
+    encoded_message,
     header_partial: [0],
     leaf_proof: [0],
     mmr_root: [0],
   };
+  // const args = {
+  //   encoded_message,
+  //   header_partial,
+  //   leaf_proof,
+  //   mmr_root,
+  // };
   console.log("args", JSON.stringify(args));
   const result = await account.functionCall({
     contractId: ANCHOR_CONTRACT_ID as string,
-    methodName: "relay",
+    methodName: "verify_and_apply_appchain_message",
     args,
     gas: DEFAULT_GAS,
     attachedDeposit: new BN("0"),
