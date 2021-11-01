@@ -8,6 +8,9 @@ import {
 export interface Commitment {
   height: number;
   commitment: string;
+  tx_id?: string;
+  need_completes?: string;
+  status?: number;
 }
 
 export interface Proof {

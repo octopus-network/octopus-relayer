@@ -7,8 +7,9 @@ export const dbAllAsync = promisify(db.all.bind(db));
 export const dbGetAsync = promisify(db.get.bind(db));
 
 export function initDb() {
+  // 0: received, 1: relayed, 2: failed
   db.run(
-    "CREATE TABLE IF NOT EXISTS commitments(height INTEGER, commitment TEXT, created_at TEXT, updated_at TEXT, status INTEGER)"
+    "CREATE TABLE IF NOT EXISTS commitments(height INTEGER, commitment TEXT, created_at TEXT, updated_at TEXT, tx_id TEXT, need_completes TEXT, status INTEGER)"
   );
   // type == 1 means for commitments
   db.run(
