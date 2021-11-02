@@ -186,6 +186,19 @@ async function handleCommitment(
   );
   console.log("decoded_messages", JSON.stringify(decoded_messages));
 
+  let needCompletes: any = {
+    planNewEra: false,
+    eraPayout: false,
+  };
+
+  decoded_messages.forEach((msg: any) => {
+    if (msg.payload_type.toString() === "PlanNewEra") {
+      needCompletes.planNewEra = true;
+    } else if (msg.payload_type.toString() === "EraPayout") {
+      needCompletes.eraPayout = true;
+    }
+  });
+
   const dataBuffer = Buffer.from(data.toString().slice(2), "hex");
   const encoded_messages = Array.from(dataBuffer);
   const leafIndex = commitment.height;
@@ -214,6 +227,11 @@ async function handleCommitment(
   let txId: string = "";
   let failedCall: any = null;
   try {
+    for (let index = 0; index < decoded_messages.length; index++) {
+      const payloadTypeString = decoded_messages[index].payload_type.toString();
+      await tryReadyCommitment(account, payloadTypeString);
+    }
+
     const callResult: any = await relay(
       account,
       commitment.commitment,
@@ -227,6 +245,7 @@ async function handleCommitment(
     }
   } catch (e: any) {
     if (e.transaction_outcome) {
+      console.error("handleCommitment error", e);
       txId = e.transaction_outcome.id;
       failedCall = e;
     } else {
@@ -234,19 +253,8 @@ async function handleCommitment(
     }
   }
 
-  const needCompletes = {
-    planNewEra: false,
-    eraPayout: false,
-  };
-
-  if (!failedCall) {
-    decoded_messages.forEach((msg: any) => {
-      if (msg.payload_type.toString() === "PlanNewEra") {
-        needCompletes.planNewEra = true;
-      } else if (msg.payload_type.toString() === "EraPayout") {
-        needCompletes.eraPayout = true;
-      }
-    });
+  if (failedCall) {
+    needCompletes = null;
   }
 
   if (failedCall) {
@@ -415,6 +423,35 @@ async function getOffchainDataForCommitment(
     await appchain.rpc.offchain.localStorageGet("PERSISTENT", key)
   ).toString();
   return data;
+}
+
+async function tryReadyCommitment(
+  account: Account,
+  payloadTypeString: "PlanNewEra" | "EraPayout"
+): Promise<boolean | undefined> {
+  console.log("tryReadyCommitment", payloadTypeString);
+  if (payloadTypeString == "PlanNewEra") {
+    const switchingEraResult = await tryComplete(
+      account,
+      "try_complete_switching_era"
+    );
+    if (!switchingEraResult) {
+      return await tryReadyCommitment(account, payloadTypeString);
+    } else {
+      return true;
+    }
+  }
+  if (payloadTypeString == "EraPayout") {
+    const distributingRewardtResult = await tryComplete(
+      account,
+      "try_complete_distributing_reward"
+    );
+    if (!distributingRewardtResult) {
+      return await tryReadyCommitment(account, payloadTypeString);
+    } else {
+      return true;
+    }
+  }
 }
 
 async function tryCompleteCommitments(account: Account) {
