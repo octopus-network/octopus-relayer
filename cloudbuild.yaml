@@ -1,9 +1,5 @@
 steps:
-- name: "gcr.io/cloud-builders/docker"
-  args: ["build", "-t", "gcr.io/$PROJECT_ID/$REPO_NAME:$COMMIT_SHA", "-t", "gcr.io/$PROJECT_ID/$REPO_NAME:latest", "."]
-- name: "gcr.io/cloud-builders/docker"
-  args: ["push", "gcr.io/$PROJECT_ID/$REPO_NAME:$COMMIT_SHA"]
-- name: "gcr.io/cloud-builders/docker"
-  args: ["push", "gcr.io/$PROJECT_ID/$REPO_NAME:latest"]
-options:
-  machineType: 'E2_HIGHCPU_32'
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME', '.' ]
+images:
+- 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME'
