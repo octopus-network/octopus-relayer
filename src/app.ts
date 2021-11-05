@@ -221,6 +221,12 @@ async function handleCommitment(
     extrinsics_root: cHeader.extrinsicsRoot,
     digest: cHeader.digest,
   };
+  console.log("==========proof data===========");
+  console.log("mmr_root", mmr_root.toString());
+  console.log("leaf_proof", leaf_proof);
+  console.log("commitment", commitment.commitment);
+  console.log("header hash", cBlockHash.hash.toString());
+  console.log("===============================");
 
   console.log("the crosschain data: ", data);
 
