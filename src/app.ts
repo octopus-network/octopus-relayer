@@ -276,6 +276,15 @@ async function syncFinalizedHeights(appchain: ApiPromise) {
   });
 }
 
+async function subscribeJustifications(appchain: ApiPromise) {
+  appchain.rpc.beefy.subscribeJustifications((justifications) => {
+    console.log("justifications.commitment.payload: ", justifications.commitment.payload.toString());
+    console.log("justifications.commitment.blockNumber: ", justifications.commitment.blockNumber.toString());
+    console.log("justifications.commitment.validatorSetId: ", justifications.commitment.validatorSetId.toString());
+    console.log("justifications.signatures: ", justifications.signatures.toString());
+  });
+}
+
 async function relay(
   account: Account,
   // decoded_messages:
@@ -501,8 +510,7 @@ async function tryCompleteCommitments(account: Account) {
 
 async function start() {
   const { appchain, account } = await init();
-  // appchain.rpc.beefy.subscribeJustifications((justifications) => {
-  // });
+  subscribeJustifications(appchain);
   syncBlocks(appchain);
   handleCommitments(appchain, account);
   tryCompleteCommitments(account);
