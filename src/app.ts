@@ -4,6 +4,8 @@ import { Event, Hash, Header } from "@polkadot/types/interfaces";
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
 import { decodeAddress, encodeAddress } from "@polkadot/keyring";
+const keccak256 = require("keccak256");
+const { MerkleTree } = require("merkletreejs");
 
 import types from "./types";
 import {
@@ -277,11 +279,43 @@ async function syncFinalizedHeights(appchain: ApiPromise) {
 }
 
 async function subscribeJustifications(appchain: ApiPromise) {
-  appchain.rpc.beefy.subscribeJustifications((justifications) => {
-    console.log("justifications.commitment.payload: ", justifications.commitment.payload.toString());
-    console.log("justifications.commitment.blockNumber: ", justifications.commitment.blockNumber.toString());
-    console.log("justifications.commitment.validatorSetId: ", justifications.commitment.validatorSetId.toString());
-    console.log("justifications.signatures: ", justifications.signatures.toString());
+  appchain.rpc.beefy.subscribeJustifications(async (justification) => {
+    console.log("justification", JSON.stringify(justification));
+    // console.log(
+    //   "justification.commitment.payload: ",
+    //   justification.commitment.payload.toString()
+    // );
+    // console.log(
+    //   "justification.commitment.blockNumber: ",
+    //   justification.commitment.blockNumber.toString()
+    // );
+    // console.log(
+    //   "justification.commitment.validatorSetId: ",
+    //   justification.commitment.validatorSetId.toString()
+    // );
+    // console.log(
+    //   "justification.signatures: ",
+    //   justification.signatures.toString()
+    // );
+    const blockHash = await appchain.rpc.chain.getBlockHash(
+      justification.commitment.blockNumber
+    );
+    const authorities = (
+      await appchain.query.beefy.authorities.at(blockHash)
+    ).toJSON() as string[];
+    console.log("authorities", authorities);
+    const leaves = authorities.map((a) => keccak256(a));
+    console.log("leaves", leaves);
+    const tree = new MerkleTree(leaves, keccak256, { sort: true });
+    const root = tree.getHexRoot();
+
+    const proofs = authorities.map((authority, index) => {
+      const leaf = keccak256(authority);
+      const proof = tree.getHexProof(leaf);
+      return proof;
+    });
+
+    console.log("proofs", proofs);
   });
 }
 
