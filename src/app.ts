@@ -1,5 +1,5 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
-import { TypeRegistry, createType } from "@polkadot/types";
+import { decodeData } from "./utils";
 import { Event, Hash, Header } from "@polkadot/types/interfaces";
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
@@ -168,22 +168,18 @@ async function handleCommitment(
     appchain,
     commitment.commitment
   );
-  const registry = new TypeRegistry();
-  const typeObject = {
-    Messages: "Vec<Message>",
-    Message: {
-      nonce: "u64",
-      payload_type: "PayloadType",
-      payload: "Vec<u8>",
+  const decoded_messages: any = decodeData(
+    {
+      Messages: "Vec<Message>",
+      Message: {
+        nonce: "u64",
+        payload_type: "PayloadType",
+        payload: "Vec<u8>",
+      },
+      PayloadType: {
+        _enum: ["BurnAsset", "Lock", "PlanNewEra", "EraPayout"],
+      },
     },
-    PayloadType: {
-      _enum: ["BurnAsset", "Lock", "PlanNewEra", "EraPayout"],
-    },
-  };
-  registry.register(typeObject);
-  const decoded_messages: any = createType(
-    registry,
-    Object.keys(typeObject)[0],
     data
   );
   console.log("decoded_messages", JSON.stringify(decoded_messages));
@@ -206,6 +202,7 @@ async function handleCommitment(
   const leafIndex = commitment.height;
 
   const rawProof = await appchain.rpc.mmr.generateProof(leafIndex, header.hash);
+  console.log("rawProof", rawProof);
   const leaf_proof: Proof = {
     leaf_index: leafIndex,
     leaf_count: header.number.toNumber(),
@@ -297,9 +294,32 @@ async function subscribeJustifications(appchain: ApiPromise) {
     //   "justification.signatures: ",
     //   justification.signatures.toString()
     // );
+
     const blockHash = await appchain.rpc.chain.getBlockHash(
       justification.commitment.blockNumber
     );
+    // const targetHash = await appchain.rpc.chain.getBlockHash(
+    //   Number(justification.commitment.blockNumber) - 1
+    // );
+    const rawMmrProofWrapper = await appchain.rpc.mmr.generateProof(
+      Number(justification.commitment.blockNumber) - 1,
+      blockHash
+    );
+    const mmrProofWrapper = rawMmrProofWrapper.toJSON();
+    console.log("mmrProofWrapper", mmrProofWrapper);
+
+    const mmrProof: any = decodeData(
+      {
+        MMRProof: {
+          leafIndex: "u64",
+          leafCount: "u64",
+          items: "Vec<Hash>",
+        },
+      },
+      mmrProofWrapper.proof
+    );
+    console.log("mmrProof", mmrProof.toJSON());
+
     const authorities = (
       await appchain.query.beefy.authorities.at(blockHash)
     ).toJSON() as string[];
