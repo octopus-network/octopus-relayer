@@ -6,6 +6,7 @@ import BN from "bn.js";
 import { decodeAddress, encodeAddress } from "@polkadot/keyring";
 const keccak256 = require("keccak256");
 const { MerkleTree } = require("merkletreejs");
+import { convertToSimplifiedMMRProof, SimplifiedMMRProof } from "./mmr";
 
 import types from "./types";
 import {
@@ -298,9 +299,6 @@ async function subscribeJustifications(appchain: ApiPromise) {
     const blockHash = await appchain.rpc.chain.getBlockHash(
       justification.commitment.blockNumber
     );
-    // const targetHash = await appchain.rpc.chain.getBlockHash(
-    //   Number(justification.commitment.blockNumber) - 1
-    // );
     const rawMmrProofWrapper = await appchain.rpc.mmr.generateProof(
       Number(justification.commitment.blockNumber) - 1,
       blockHash
@@ -336,6 +334,14 @@ async function subscribeJustifications(appchain: ApiPromise) {
     });
 
     console.log("proofs", proofs);
+    const simplifiedProof = convertToSimplifiedMMRProof(
+      mmrProofWrapper.blockHash,
+      mmrProof.leafIndex,
+      mmrProofWrapper.leaf,
+      mmrProof.leafCount,
+      mmrProof.items
+    );
+    console.log("simplifiedProof", JSON.stringify(simplifiedProof));
   });
 }
 
