@@ -324,15 +324,15 @@ export function convertToSimplifiedMMRProof(
   const mmrSize = leafCountToMmrSize(leafCount);
   const peaks = getPeakPositions(mmrSize);
 
-  console.log("proofItems", proofItems);
-  console.log("peaks.length", peaks.length);
+  console.log("proofItems", JSON.stringify(proofItems));
+  console.log("peaks", peaks);
   console.log("leafPos", leafPos);
 
   for (let i = 0; i < peaks.length; i++) {
     if ((i == 0 || leafPos > peaks[i - 1]) && leafPos <= peaks[i]) {
       merkleRootPeakPosition = i;
       if (i == peaks.length - 1) {
-        for (let j = 0; j < proofItems.length; j++) {
+        for (let j = proofItemPosition; j < proofItems.length; j++) {
           merkleProof.push(proofItems[j]);
         }
       } else {
@@ -343,6 +343,7 @@ export function convertToSimplifiedMMRProof(
         break;
       }
     } else {
+      console.log("proofItemPosition", proofItemPosition);
       readyMadePeakHashes.push(proofItems[proofItemPosition]);
       proofItemPosition += 1;
     }
