@@ -5,6 +5,7 @@ import {
   Digest,
   BlockNumber,
 } from "@polkadot/types/interfaces";
+import { DetectCodec } from "@polkadot/types/types";
 export interface Commitment {
   height: number;
   commitment: string;
@@ -35,4 +36,26 @@ export interface HeaderPartial {
 export interface SYNCEDBLOCK {
   height: number;
   type: number;
+}
+
+export interface MerkleProof {
+  root: number[];
+  proof: number[][];
+  number_of_leaves: number;
+  leaf_index: number;
+  leaf: number[];
+}
+
+export interface MessageProof {
+  messages: number[];
+  header: number[];
+  mmr_leaf: number[];
+  mmr_proof: number[];
+}
+
+export interface LightClientState {
+  signed_commitment: number[];
+  validator_proofs: MerkleProof[];
+  mmr_leaf: number[];
+  mmr_proof: number[];
 }

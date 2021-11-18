@@ -1,5 +1,6 @@
 import { Hash } from "@polkadot/types/interfaces";
 const { soliditySha3 } = require("web3-utils");
+import { logJSON } from "./utils";
 
 interface MountainData {
   position: number;
@@ -19,6 +20,10 @@ function numOfPeaks(numLeaves: number): number {
 
 function leafIndexToPos(index: number): number {
   return leafIndexToMmrSize(index) - trailingZeros(index + 1);
+}
+
+function leafIndexToPosition(index: number): number {
+  return leafIndexToMmrSize(index) - trailingZeros(index + 1) - 1;
 }
 
 function bitCount(n: number): number {
@@ -64,7 +69,42 @@ function trailingZeros(x: number): number {
 }
 
 function getPeakPositions(width: number): number[] {
-  const peakPositions: number[] = new Array(numOfPeaks(width));
+  const peakPositions: number[] = new Array();
+  let count: number = 0;
+  let size: number = 0;
+  for (let i = 255; i > 0; i--) {
+    if ((width & (1 << (i - 1))) != 0) {
+      size = size + (1 << i) - 1;
+      peakPositions[count++] = size;
+    }
+  }
+  if (count != peakPositions.length) {
+    throw Error("Invalid bit calculation");
+  }
+  return peakPositions;
+}
+
+function getPeakPosByHeight(height: number): number {
+  return (1 << (height + 1)) - 2;
+}
+
+function leftPeakHeightPos(mmrSize: number) {
+  let height = 1;
+  let previousPosition = 0;
+  let pos = getPeakPosByHeight(height);
+  while (pos < mmrSize) {
+    height += 1;
+    previousPosition = pos;
+    pos = getPeakPosByHeight(height);
+  }
+  return {
+    height: height - 1,
+    position: previousPosition,
+  };
+}
+
+function getPeaks(width: number): number[] {
+  const peakPositions: number[] = new Array();
   let count: number = 0;
   let size: number = 0;
   for (let i = 255; i > 0; i--) {
@@ -313,7 +353,7 @@ export function convertToSimplifiedMMRProof(
   leafCount: number,
   proofItems: any[]
 ): SimplifiedMMRProof | {} {
-  const leafPos = leafIndexToPos(leafIndex);
+  const leafPos = leafIndexToPosition(leafIndex);
   const readyMadePeakHashes = [];
   let optionalRightBaggedPeak = "";
   let merkleProof: any[] = [];
@@ -322,11 +362,14 @@ export function convertToSimplifiedMMRProof(
   let merkleRootPeakPosition: number = 0;
 
   const mmrSize = leafCountToMmrSize(leafCount);
-  const peaks = getPeakPositions(mmrSize);
+  logJSON("mmrSize", mmrSize);
+  const peakPositions = getPeakPositions(mmrSize);
+  const peaks = getPeaks(mmrSize);
+  logJSON("pPos-", peakPositions);
+  logJSON("peaks", peaks);
 
-  console.log("proofItems", JSON.stringify(proofItems));
-  console.log("peaks", peaks);
-  console.log("leafPos", leafPos);
+  logJSON("proofItems", proofItems);
+  logJSON("leafPos", leafPos);
 
   for (let i = 0; i < peaks.length; i++) {
     if ((i == 0 || leafPos > peaks[i - 1]) && leafPos <= peaks[i]) {
@@ -343,12 +386,12 @@ export function convertToSimplifiedMMRProof(
         break;
       }
     } else {
-      console.log("proofItemPosition", proofItemPosition);
       readyMadePeakHashes.push(proofItems[proofItemPosition]);
       proofItemPosition += 1;
     }
   }
 
+  logJSON("merkleRootPeakPosition", merkleRootPeakPosition);
   let localizedMerkleRootPosition: number;
   if (merkleRootPeakPosition == 0) {
     localizedMerkleRootPosition = leafPos;
@@ -356,6 +399,7 @@ export function convertToSimplifiedMMRProof(
     localizedMerkleRootPosition =
       leafPos - peaks[merkleRootPeakPosition - 1] - 1;
   }
+  logJSON("localizedMerkleRootPosition", localizedMerkleRootPosition);
 
   let proofOrder = calculateMerkleProofOrder(
     localizedMerkleRootPosition,
@@ -365,13 +409,18 @@ export function convertToSimplifiedMMRProof(
   if (typeof proofOrder === "undefined") {
     return {};
   }
+  logJSON("proofOrder", proofOrder);
+  logJSON("optionalRightBaggedPeak", optionalRightBaggedPeak);
 
+  // Adding peaks into merkle proof itself
   let currentProofOrderIndex = merkleProof.length - 1;
   if (optionalRightBaggedPeak != "") {
     currentProofOrderIndex += 1;
     proofOrder = proofOrder | (1 << currentProofOrderIndex);
     merkleProof.push(optionalRightBaggedPeak);
   }
+  logJSON("merkleProof", merkleProof);
+  logJSON("readyMadePeakHashes", readyMadePeakHashes);
   for (let i = 0; i < readyMadePeakHashes.length; i++) {
     currentProofOrderIndex += 1;
     merkleProof.push(readyMadePeakHashes[readyMadePeakHashes.length - i - 1]);
