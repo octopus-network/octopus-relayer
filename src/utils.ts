@@ -14,5 +14,5 @@ export function logJSON(desc: string, data: any): any {
 }
 
 export function toNumArray(data: DetectCodec<any, any>): number[] {
-  return Array.from(data.toU8a());
+  return Array.from(Buffer.from(data.toHex().slice(2), "hex"));
 }

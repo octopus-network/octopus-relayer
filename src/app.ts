@@ -288,7 +288,10 @@ async function subscribeJustifications(appchain: ApiPromise) {
   appchain.rpc.beefy.subscribeJustifications(async (justification) => {
     console.log("justification", JSON.stringify(justification));
     console.log("justification encode", JSON.stringify(justification.toHex()));
-
+    console.log(
+      "justification.commitment.blockNumber",
+      justification.commitment.blockNumber
+    );
     const currBlockHash = await appchain.rpc.chain.getBlockHash(
       justification.commitment.blockNumber
     );
@@ -297,6 +300,8 @@ async function subscribeJustifications(appchain: ApiPromise) {
       currBlockHash
     );
     logJSON("rawMmrProofWrapper", rawMmrProofWrapper);
+    const decodedMmrProofWrapper = decodeMmrProofWrapper(rawMmrProofWrapper);
+    logJSON("decodedMmrProofWrapper", decodedMmrProofWrapper);
 
     // const validatorProof = {
     //   root: justification.commitment.payload.toJSON(),
@@ -313,7 +318,7 @@ async function subscribeJustifications(appchain: ApiPromise) {
       "leaves",
       leaves.map((a) => a.toString("hex"))
     );
-    const tree = new MerkleTree(leaves, keccak256);
+    const tree = new MerkleTree(leaves, keccak256, { sort: true });
     const root = tree.getHexRoot();
     const merkleProofs = authorityArray.map((authority, index) => {
       const leaf = keccak256(authority);
