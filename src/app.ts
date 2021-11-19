@@ -313,7 +313,7 @@ async function subscribeJustifications(appchain: ApiPromise) {
       "leaves",
       leaves.map((a) => a.toString("hex"))
     );
-    const tree = new MerkleTree(leaves, keccak256, { sort: true });
+    const tree = new MerkleTree(leaves, keccak256);
     const root = tree.getHexRoot();
     const merkleProofs = authorityArray.map((authority, index) => {
       const leaf = keccak256(authority);
