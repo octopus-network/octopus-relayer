@@ -194,7 +194,6 @@ async function handleCommitment(
   const leafIndex = commitment.height;
 
   const rawProof = await appchain.rpc.mmr.generateProof(leafIndex, header.hash);
-  const { blockHash, mmrProof, mmrLeaf } = decodeMmrProofWrapper(rawProof);
 
   const mmr_root = await appchain.query.mmr.rootHash.at(header.hash);
   const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height);
@@ -202,8 +201,8 @@ async function handleCommitment(
   const messageProof: MessageProof = {
     header: toNumArray(cHeader),
     messages: toNumArray(decoded_messages),
-    mmr_leaf: toNumArray(mmrLeaf),
-    mmr_proof: toNumArray(mmrProof),
+    mmr_leaf: toNumArray(rawProof.leaf),
+    mmr_proof: toNumArray(rawProof.proof),
   };
   let txId: string = "";
   let failedCall: any = null;
@@ -297,13 +296,12 @@ async function subscribeJustifications(appchain: ApiPromise) {
       Number(justification.commitment.blockNumber) - 1,
       currBlockHash
     );
-    const { blockHash, mmrProof, mmrLeaf } =
-      decodeMmrProofWrapper(rawMmrProofWrapper);
+    logJSON("rawMmrProofWrapper", rawMmrProofWrapper);
 
-    const validatorProof = {
-      root: justification.commitment.payload.toJSON(),
-      proof: mmrProof.toJSON(),
-    };
+    // const validatorProof = {
+    //   root: justification.commitment.payload.toJSON(),
+    //   proof: mmrProof.toJSON(),
+    // };
 
     const authorities = (await appchain.query.beefy.authorities.at(
       currBlockHash
@@ -333,8 +331,8 @@ async function subscribeJustifications(appchain: ApiPromise) {
     const lightClientState = {
       signed_commitment: toNumArray(justification) as number[],
       validator_proofs: merkleProofs,
-      mmr_leaf: toNumArray(mmrLeaf),
-      mmr_proof: toNumArray(mmrProof),
+      mmr_leaf: toNumArray(rawMmrProofWrapper.leaf),
+      mmr_proof: toNumArray(rawMmrProofWrapper.proof),
     };
 
     await updateState(lightClientState);
