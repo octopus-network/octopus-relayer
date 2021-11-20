@@ -18,6 +18,7 @@
     "@polkadot/types": "^6.8.2-2",
     "chalk": "^4.1.1",
     "dotenv": "^10.0.0",
+    "ethereum-public-key-to-address": "^0.0.5",
     "keccak256": "^1.0.3",
     "merkletreejs": "^0.2.24",
     "near-api-js": "^0.41.0",

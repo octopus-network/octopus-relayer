@@ -7,6 +7,7 @@ import BN from "bn.js";
 import { toCamel, toSnake } from "snake-camel";
 import { decodeAddress, encodeAddress } from "@polkadot/keyring";
 const keccak256 = require("keccak256");
+const publicKeyToAddress = require("ethereum-public-key-to-address");
 const { MerkleTree } = require("merkletreejs");
 import { convertToSimplifiedMMRProof, SimplifiedMMRProof } from "./mmr";
 import {
@@ -308,27 +309,27 @@ async function subscribeJustifications(appchain: ApiPromise) {
     //   proof: mmrProof.toJSON(),
     // };
 
-    const authorities = (await appchain.query.beefy.authorities.at(
+    const rawAuthorities = (await appchain.query.beefy.authorities.at(
       currBlockHash
     )) as DetectCodec<any, any>;
-    const authorityArray = authorities.toJSON() as string[];
+
+    const authorities = rawAuthorities.toJSON();
     logJSON("authorities", authorities);
-    const leaves = authorityArray.map((a) => keccak256(a));
-    logJSON(
-      "leaves",
-      leaves.map((a) => a.toString("hex"))
-    );
-    const tree = new MerkleTree(leaves, keccak256, { sort: true });
-    const root = tree.getHexRoot();
-    const merkleProofs = authorityArray.map((authority, index) => {
-      const leaf = keccak256(authority);
+    const ethAddrs = authorities.map((a: string) => publicKeyToAddress(a));
+    console.log("ethAddrs", ethAddrs);
+    const leaves = ethAddrs.map((a: string) => keccak256(a));
+    const tree = new MerkleTree(leaves, keccak256);
+    const root = tree.getRoot().toString("hex");
+    console.log("root", root);
+
+    const merkleProofs = leaves.map((leaf: any, index: number) => {
       const proof = tree.getHexProof(leaf);
       const merkleProof: MerkleProof = {
-        root: Array.from(Buffer.from(root.slice(2), "hex")),
+        root: toNumArray(root),
         proof,
-        number_of_leaves: authorityArray.length,
+        number_of_leaves: leaves.length,
         leaf_index: index,
-        leaf: toNumArray(authorities[index]),
+        leaf: toNumArray(ethAddrs[index]),
       };
       return merkleProof;
     });

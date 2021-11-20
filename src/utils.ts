@@ -14,5 +14,14 @@ export function logJSON(desc: string, data: any): any {
 }
 
 export function toNumArray(data: DetectCodec<any, any>): number[] {
-  return Array.from(Buffer.from(data.toHex().slice(2), "hex"));
+  if (typeof data === "string") {
+    return hexStringToNumArray(data);
+  } else {
+    return hexStringToNumArray(data.toString());
+  }
+}
+
+function hexStringToNumArray(hex: string): number[] {
+  const hexString = hex.slice(0, 2) === "0x" ? hex.slice(2) : hex;
+  return Array.from(Buffer.from(hexString, "hex"));
 }
