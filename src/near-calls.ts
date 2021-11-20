@@ -1,21 +1,7 @@
-import { ApiPromise, WsProvider } from "@polkadot/api";
-import { DetectCodec } from "@polkadot/types/types";
-import { decodeData } from "./utils";
-import { Event, Hash, Header } from "@polkadot/types/interfaces";
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
-import { toCamel, toSnake } from "snake-camel";
-import { decodeAddress, encodeAddress } from "@polkadot/keyring";
-const keccak256 = require("keccak256");
-const { MerkleTree } = require("merkletreejs");
-import { convertToSimplifiedMMRProof, SimplifiedMMRProof } from "./mmr";
-import { logJSON } from "./utils";
-import {
-  MerkleProof,
-  Proof,
-  LightClientState,
-  MessageProof,
-} from "./interfaces";
+
+import { LightClientState, MessageProof } from "./interfaces";
 const util = require("util");
 
 const DEFAULT_GAS = new BN("300000000000000");
@@ -52,33 +38,47 @@ export async function relayMessages(args: MessageProof) {
   console.log("relayMessages-----------------------");
   console.log("\x1b[34m%s\x1b[0m", JSON.stringify(args));
   console.log("------------------------------------");
-  // const relayResult: any = await account.functionCall({
-  //   contractId: ANCHOR_CONTRACT_ID as string,
-  //   methodName: "verify_and_apply_appchain_messages",
-  //   args,
-  //   gas: DEFAULT_GAS,
-  //   attachedDeposit: new BN("0"),
-  // });
-  // console.log("relayResult", relayResult);
+  const relayMessagesResult: any = await account.functionCall({
+    contractId: ANCHOR_CONTRACT_ID as string,
+    methodName: "verify_and_apply_appchain_messages",
+    args,
+    gas: DEFAULT_GAS,
+    attachedDeposit: new BN("0"),
+  });
+  const reqStatus = JSON.parse(
+    Buffer.from(relayMessagesResult.status.SuccessValue, "base64").toString(
+      "utf8"
+    )
+  );
+  console.log("reqStatus", reqStatus);
 
-  // return relayResult;
-  return {};
+  return relayMessagesResult;
 }
 
 export async function updateState(args: LightClientState) {
   console.log("updateState========================");
   console.log("\x1b[32m%s\x1b[0m", JSON.stringify(args));
   console.log("===================================");
-  // const relayResult: any = await account.functionCall({
-  //   contractId: ANCHOR_CONTRACT_ID as string,
-  //   methodName: "update_state",
-  //   args,
-  //   gas: DEFAULT_GAS,
-  //   attachedDeposit: new BN("0"),
-  // });
-  // console.log("relayResult", relayResult);
+  const relayResult: any = await account.functionCall({
+    contractId: ANCHOR_CONTRACT_ID as string,
+    methodName: "update_state",
+    args,
+    gas: DEFAULT_GAS,
+    attachedDeposit: new BN("0"),
+  });
+  const reqStatus = JSON.parse(
+    Buffer.from(relayResult.status.SuccessValue, "base64").toString("utf8")
+  );
+  console.log("reqStatus", reqStatus);
+  return relayResult;
+}
 
-  // return relayResult;
+export async function getLatestCommitmentBlockNumber() {
+  return await account.viewFunction(
+    ANCHOR_CONTRACT_ID as string,
+    "get_latest_commitment_block_number",
+    {}
+  );
 }
 
 export async function tryComplete(methodName: string) {

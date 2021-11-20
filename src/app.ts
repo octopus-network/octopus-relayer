@@ -14,6 +14,7 @@ import {
   initNearRpc,
   relayMessages,
   updateState,
+  getLatestCommitmentBlockNumber,
   tryComplete,
 } from "./near-calls";
 
@@ -83,7 +84,7 @@ async function syncBlocks(appchain: ApiPromise) {
   if (nextHeight > latestFinalizedHeight) {
     syncBlocks(appchain);
   } else {
-    // console.log("nextHeight", nextHeight);
+    console.log("nextHeight", nextHeight);
     if (nextHeight <= latestFinalizedHeight - BLOCK_SYNC_SIZE) {
       const promises = new Array(BLOCK_SYNC_SIZE)
         .fill(1)
@@ -136,15 +137,11 @@ async function handleCommitments(appchain: ApiPromise) {
     const currentHeight = nextHeight - 1;
     const unMarkedCommitments = await getUnmarkedCommitments(currentHeight);
     if (unMarkedCommitments.length > 0) {
-      const currentBlockHash = await appchain.rpc.chain.getBlockHash(
-        nextHeight
-      );
-      const header = await appchain.rpc.chain.getHeader(currentBlockHash);
       unMarkedCommitments;
       // Use try-catch here instead of in handleCommitment for issuring the excecution order.
       for (let index = 0; index < unMarkedCommitments.length; index++) {
         // Excecute by order.
-        await handleCommitment(unMarkedCommitments[index], appchain, header);
+        await handleCommitment(unMarkedCommitments[index], appchain);
       }
     }
   } catch (e) {
@@ -153,13 +150,8 @@ async function handleCommitments(appchain: ApiPromise) {
   handleCommitments(appchain);
 }
 
-async function handleCommitment(
-  commitment: Commitment,
-  appchain: ApiPromise,
-  header: Header
-) {
-  console.log("handleCommitment", commitment.commitment);
-  const data = await getOffchainDataForCommitment(
+async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
+  const encoded_messages = await getOffchainDataForCommitment(
     appchain,
     commitment.commitment
   );
@@ -175,9 +167,8 @@ async function handleCommitment(
         _enum: ["BurnAsset", "Lock", "PlanNewEra", "EraPayout"],
       },
     },
-    data
+    encoded_messages
   );
-  console.log("decoded_messages", JSON.stringify(decoded_messages));
 
   let needCompletes: any = {
     planNewEra: false,
@@ -192,16 +183,35 @@ async function handleCommitment(
     }
   });
 
-  const leafIndex = commitment.height;
+  const blockNumberInAnchor = await getLatestCommitmentBlockNumber();
+  if (
+    commitment.height >= blockNumberInAnchor ||
+    commitment.height > latestFinalizedHeight ||
+    blockNumberInAnchor > latestFinalizedHeight
+  ) {
+    return;
+  }
+  console.log("decoded_messages", JSON.stringify(decoded_messages));
+  console.log("blockNumberInAnchor", blockNumberInAnchor);
+  console.log("latestFinalizedHeight", latestFinalizedHeight);
+  console.log("commitment.height", commitment.height);
+  const blockHashInAnchor = await appchain.rpc.chain.getBlockHash(
+    blockNumberInAnchor
+  );
+  logJSON("blockHashInAnchor", blockHashInAnchor);
+  const rawProof = await appchain.rpc.mmr.generateProof(
+    commitment.height,
+    blockHashInAnchor
+  );
 
-  const rawProof = await appchain.rpc.mmr.generateProof(leafIndex, header.hash);
+  logJSON("rawProof", rawProof);
 
-  const mmr_root = await appchain.query.mmr.rootHash.at(header.hash);
+  // const mmr_root = await appchain.query.mmr.rootHash.at(blockHashInAnchor);
   const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height);
   const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
   const messageProof: MessageProof = {
-    header: toNumArray(cHeader),
-    messages: toNumArray(decoded_messages),
+    header: toNumArray(cHeader.toHex()),
+    messages: toNumArray(encoded_messages),
     mmr_leaf: toNumArray(rawProof.leaf),
     mmr_proof: toNumArray(rawProof.proof),
   };
@@ -289,10 +299,6 @@ async function subscribeJustifications(appchain: ApiPromise) {
   appchain.rpc.beefy.subscribeJustifications(async (justification) => {
     console.log("justification", JSON.stringify(justification));
     console.log("justification encode", JSON.stringify(justification.toHex()));
-    console.log(
-      "justification.commitment.blockNumber",
-      justification.commitment.blockNumber
-    );
     const currBlockHash = await appchain.rpc.chain.getBlockHash(
       justification.commitment.blockNumber
     );
@@ -323,10 +329,12 @@ async function subscribeJustifications(appchain: ApiPromise) {
     console.log("root", root);
 
     const merkleProofs = leaves.map((leaf: any, index: number) => {
-      const proof = tree.getHexProof(leaf);
+      const proof: string[] = tree.getHexProof(leaf);
+      console.log("proof", proof);
+      const u8aProof = proof.map((hash) => toNumArray(hash));
       const merkleProof: MerkleProof = {
         root: toNumArray(root),
-        proof,
+        proof: u8aProof,
         number_of_leaves: leaves.length,
         leaf_index: index,
         leaf: toNumArray(ethAddrs[index]),
@@ -335,13 +343,17 @@ async function subscribeJustifications(appchain: ApiPromise) {
     });
 
     const lightClientState = {
-      signed_commitment: toNumArray(justification) as number[],
+      signed_commitment: toNumArray(justification.toHex()) as number[],
       validator_proofs: merkleProofs,
       mmr_leaf: toNumArray(rawMmrProofWrapper.leaf),
       mmr_proof: toNumArray(rawMmrProofWrapper.proof),
     };
 
-    await updateState(lightClientState);
+    try {
+      await updateState(lightClientState);
+    } catch (err) {
+      console.log(err);
+    }
 
     // const simplifiedProof = convertToSimplifiedMMRProof(
     //   blockHash,
