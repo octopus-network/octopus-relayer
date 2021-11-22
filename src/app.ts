@@ -14,9 +14,14 @@ import {
   updateSyncedBlock,
   syncFinalizedHeights,
 } from "./blockHeights";
-import { storeCommitment, handleCommitments } from "./commitments";
+import {
+  storeCommitment,
+  handleCommitments,
+  setRelayMessagesLock,
+} from "./commitments";
 import { storeAction, confirmAction } from "./actions";
 import { tryCompleteActions } from "./actions";
+import { LightClientState, ActionType } from "./interfaces";
 
 const BLOCK_SYNC_SIZE = 20;
 
@@ -214,9 +219,12 @@ async function subscribeJustifications(appchain: ApiPromise) {
     const actionType = "UpdateState";
     try {
       await confirmAction(actionType);
+      setRelayMessagesLock(true);
       await updateState(lightClientState);
+      setRelayMessagesLock(false);
       await storeAction(actionType);
     } catch (err) {
+      setRelayMessagesLock(false);
       console.log(err);
     }
 

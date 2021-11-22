@@ -4,7 +4,13 @@ import { relayMessages, getLatestCommitmentBlockNumber } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
 import { storeAction, confirmAction } from "./actions";
-import { Commitment, ActionType, MessageProof } from "./interfaces";
+import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
+
+let relayMessagesLock = false;
+
+export function setRelayMessagesLock(status: boolean) {
+  relayMessagesLock = status;
+}
 
 export async function handleCommitments(appchain: ApiPromise) {
   try {
@@ -86,6 +92,9 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
       await confirmAction(payloadTypeString);
     }
 
+    if (relayMessagesLock) {
+      return;
+    }
     const callResult: any = await relayMessages(messageProof);
     if (callResult.transaction_outcome) {
       txId = callResult.transaction_outcome.id;
