@@ -47,7 +47,7 @@ export interface MerkleProof {
 }
 
 export interface MessageProof {
-  messages: number[];
+  encoded_messages: number[];
   header: number[];
   mmr_leaf: number[];
   mmr_proof: number[];

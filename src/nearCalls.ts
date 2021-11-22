@@ -88,5 +88,7 @@ export async function tryComplete(methodName: string) {
     );
   }
   console.log("tryComplete returnVal: ", returnVal);
-  return returnVal;
+  const isBoolTrue = returnVal && typeof returnVal === "boolean";
+  const isOk = returnVal === "Ok";
+  return isBoolTrue || isOk;
 }

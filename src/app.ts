@@ -233,6 +233,7 @@ async function subscribeJustifications(appchain: ApiPromise) {
 
 async function start() {
   const { appchain, account } = await init();
+
   subscribeJustifications(appchain);
   syncBlocks(appchain);
   handleCommitments(appchain);

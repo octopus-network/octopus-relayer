@@ -6,17 +6,27 @@ import { dbRunAsync, dbAllAsync, upsertActions } from "./db";
 import { Action, ActionType } from "./interfaces";
 
 export async function storeAction(type: ActionType): Promise<any> {
-  return await upsertActions({
+  await upsertActions({
     type,
     status: 0,
   });
+  const actions = await getActions();
+  console.log("actions", actions);
 }
 
 async function actionCompleted(type: ActionType) {
+  console.log("actionCompleted", type);
   await dbRunAsync(`UPDATE actions SET status = ? WHERE type == ?`, [1, type]);
+  const actions = await getActions();
+  console.log("actions", actions);
 }
 
-async function getNotCompletedActions(height: number): Promise<Action[]> {
+async function getActions(): Promise<Action[]> {
+  const actions: Action[] = await dbAllAsync("SELECT * FROM actions");
+  return actions;
+}
+
+async function getNotCompletedActions(): Promise<Action[]> {
   const actions: Action[] = await dbAllAsync(
     "SELECT * FROM actions WHERE status == 0"
   );
@@ -24,9 +34,7 @@ async function getNotCompletedActions(height: number): Promise<Action[]> {
 }
 
 export async function tryCompleteActions(account: Account) {
-  const nextHeight = await getNextHeight();
-  const currentHeight = nextHeight - 1;
-  const actions: Action[] = await getNotCompletedActions(currentHeight);
+  const actions: Action[] = await getNotCompletedActions();
   for (let index = 0; index < actions.length; index++) {
     try {
       const { type } = actions[index];
@@ -34,7 +42,7 @@ export async function tryCompleteActions(account: Account) {
         const switchingEraResult = await tryComplete(
           "try_complete_switching_era"
         );
-        if (switchingEraResult === "Ok") {
+        if (switchingEraResult) {
           await actionCompleted(type);
         }
       }
@@ -42,7 +50,7 @@ export async function tryCompleteActions(account: Account) {
         const distributingRewardtResult = await tryComplete(
           "try_complete_distributing_reward"
         );
-        if (distributingRewardtResult === "Ok") {
+        if (distributingRewardtResult) {
           await actionCompleted(type);
         }
       }
@@ -50,7 +58,7 @@ export async function tryCompleteActions(account: Account) {
         const updatetStateResult = await tryComplete(
           "try_complete_updating_state_of_beefy_light_client"
         );
-        if (updatetStateResult === "Ok") {
+        if (updatetStateResult) {
           await actionCompleted(type);
         }
       }
@@ -69,7 +77,7 @@ export async function confirmAction(
   console.log("confirmAction", payloadTypeString);
   if (payloadTypeString == "PlanNewEra") {
     const switchingEraResult = await tryComplete("try_complete_switching_era");
-    if (switchingEraResult != "Ok") {
+    if (!switchingEraResult) {
       return await confirmAction(payloadTypeString);
     } else {
       return true;
@@ -79,7 +87,7 @@ export async function confirmAction(
     const distributingRewardtResult = await tryComplete(
       "try_complete_distributing_reward"
     );
-    if (distributingRewardtResult != "Ok") {
+    if (!distributingRewardtResult) {
       return await confirmAction(payloadTypeString);
     } else {
       return true;
@@ -89,7 +97,7 @@ export async function confirmAction(
     const updatetStateResult = await tryComplete(
       "try_complete_updating_state_of_beefy_light_client"
     );
-    if (updatetStateResult != "Ok") {
+    if (!updatetStateResult) {
       return await confirmAction(payloadTypeString);
     } else {
       return true;

@@ -73,7 +73,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
   const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
   const messageProof: MessageProof = {
     header: toNumArray(cHeader.toHex()),
-    messages: toNumArray(encoded_messages),
+    encoded_messages: toNumArray(encoded_messages),
     mmr_leaf: toNumArray(rawProof.leaf),
     mmr_proof: toNumArray(rawProof.proof),
   };
@@ -82,6 +82,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
   try {
     for (let index = 0; index < decoded_messages.length; index++) {
       const payloadTypeString = decoded_messages[index].payload_type.toString();
+      console.log("payloadTypeString", payloadTypeString);
       await confirmAction(payloadTypeString);
     }
 
