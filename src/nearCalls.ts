@@ -2,6 +2,7 @@ import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
 
 import { LightClientState, MessageProof } from "./interfaces";
+import { logJSON } from "./utils";
 const util = require("util");
 
 const DEFAULT_GAS = new BN("300000000000000");
@@ -38,67 +39,54 @@ export async function relayMessages(args: MessageProof) {
   console.log("relayMessages-----------------------");
   console.log("\x1b[34m%s\x1b[0m", JSON.stringify(args));
   console.log("------------------------------------");
-  const relayMessagesResult: any = await account.functionCall({
+  return await account.functionCall({
     contractId: ANCHOR_CONTRACT_ID as string,
     methodName: "verify_and_apply_appchain_messages",
     args,
     gas: DEFAULT_GAS,
     attachedDeposit: new BN("0"),
   });
-  const reqStatus = JSON.parse(
-    Buffer.from(relayMessagesResult.status.SuccessValue, "base64").toString(
-      "utf8"
-    )
-  );
-  console.log("reqStatus", reqStatus);
-
-  return relayMessagesResult;
 }
 
 export async function updateState(args: LightClientState) {
   console.log("updateState========================");
   console.log("\x1b[32m%s\x1b[0m", JSON.stringify(args));
   console.log("===================================");
-  const relayResult: any = await account.functionCall({
+  return await account.functionCall({
     contractId: ANCHOR_CONTRACT_ID as string,
-    methodName: "update_state",
+    methodName: "start_updating_state_of_beefy_light_client",
     args,
     gas: DEFAULT_GAS,
     attachedDeposit: new BN("0"),
   });
-  const reqStatus = JSON.parse(
-    Buffer.from(relayResult.status.SuccessValue, "base64").toString("utf8")
-  );
-  console.log("reqStatus", reqStatus);
-  return relayResult;
 }
 
 export async function getLatestCommitmentBlockNumber() {
-  return await account.viewFunction(
-    ANCHOR_CONTRACT_ID as string,
-    "get_latest_commitment_block_number",
-    {}
-  );
+  return (
+    await account.viewFunction(
+      ANCHOR_CONTRACT_ID as string,
+      "get_latest_commitment_of_appchain",
+      {}
+    )
+  ).block_number;
 }
 
 export async function tryComplete(methodName: string) {
-  // console.log("tryComplete", methodName);
-  // const tryCompleteResult: any = await account.functionCall({
-  //   contractId: ANCHOR_CONTRACT_ID as string,
-  //   methodName,
-  //   args: {},
-  //   gas: DEFAULT_GAS,
-  //   attachedDeposit: new BN("0"),
-  // });
-  // let returnVal = false;
-  // const returnValBase64 =
-  //   tryCompleteResult.receipts_outcome[0].outcome.status.SuccessValue;
-  // if (returnValBase64) {
-  //   returnVal = JSON.parse(
-  //     Buffer.from(returnValBase64, "base64").toString("utf8")
-  //   );
-  // }
-  // console.log("returnVal", returnVal);
-  // return returnVal;
-  return true;
+  console.log("tryComplete", methodName);
+  const tryCompleteResult: any = await account.functionCall({
+    contractId: ANCHOR_CONTRACT_ID as string,
+    methodName,
+    args: {},
+    gas: DEFAULT_GAS,
+    attachedDeposit: new BN("0"),
+  });
+  let returnVal = "";
+  const returnValBase64 = tryCompleteResult.status.SuccessValue;
+  if (returnValBase64) {
+    returnVal = JSON.parse(
+      Buffer.from(returnValBase64, "base64").toString("utf8")
+    );
+  }
+  console.log("tryComplete returnVal: ", returnVal);
+  return returnVal;
 }

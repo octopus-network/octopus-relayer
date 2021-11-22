@@ -1,17 +1,17 @@
-import {
-  Header,
-  Event,
-  Hash,
-  Digest,
-  BlockNumber,
-} from "@polkadot/types/interfaces";
-import { DetectCodec } from "@polkadot/types/types";
+import { Hash, Digest } from "@polkadot/types/interfaces";
+
+export type ActionType = "UpdateState" | "PlanNewEra" | "EraPayout";
+
 export interface Commitment {
   height: number;
   commitment: string;
   tx_id?: string;
-  need_completes?: string;
   status?: number;
+}
+
+export interface Action {
+  type: string;
+  status: number;
 }
 
 export interface Proof {
