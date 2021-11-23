@@ -1,6 +1,10 @@
 import { ApiPromise } from "@polkadot/api";
 import { decodeData, logJSON, toNumArray } from "./utils";
-import { relayMessages, getLatestCommitmentBlockNumber } from "./nearCalls";
+import {
+  relayMessages,
+  getLatestCommitmentBlockNumber,
+  tryComplete,
+} from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
 import { storeAction, confirmAction } from "./actions";
@@ -92,7 +96,13 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
       await confirmAction(payloadTypeString);
     }
 
-    if (relayMessagesLock) {
+    const inStateCompleting = !(await tryComplete(
+      "try_complete_updating_state_of_beefy_light_client"
+    ));
+
+    console.log("inStateCompleting", inStateCompleting);
+
+    if (relayMessagesLock || inStateCompleting) {
       return;
     }
     const callResult: any = await relayMessages(messageProof);

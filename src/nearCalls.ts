@@ -88,7 +88,16 @@ export async function tryComplete(methodName: string) {
     );
   }
   console.log("tryComplete returnVal: ", returnVal);
-  const isBoolTrue = returnVal && typeof returnVal === "boolean";
   const isOk = returnVal === "Ok";
-  return isBoolTrue || isOk;
+  return isOk;
 }
+
+// export async function viewComplete(methodName: string) {
+//   console.log("viewComplete", methodName);
+//   const tryCompleteResult: any = await account.viewFunction(
+//     ANCHOR_CONTRACT_ID as string,
+//     methodName,
+//     {}
+//   );
+//   return tryCompleteResult;
+// }
