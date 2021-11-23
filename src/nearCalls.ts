@@ -62,13 +62,12 @@ export async function updateState(args: LightClientState) {
 }
 
 export async function getLatestCommitmentBlockNumber() {
-  return (
-    await account.viewFunction(
-      ANCHOR_CONTRACT_ID as string,
-      "get_latest_commitment_of_appchain",
-      {}
-    )
-  ).block_number;
+  const latest_commitment = await account.viewFunction(
+    ANCHOR_CONTRACT_ID as string,
+    "get_latest_commitment_of_appchain",
+    {}
+  );
+  return latest_commitment ? latest_commitment.block_number : 0;
 }
 
 export async function tryComplete(methodName: string) {
