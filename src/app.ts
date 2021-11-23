@@ -31,10 +31,14 @@ const {
   RELAYER_PRIVATE_KEY,
   APPCHAIN_ENDPOINT,
   START_BLOCK_HEIGHT,
+  UPDATE_STATE_MIN_INTERVAL,
   NEAR_NODE_URL,
   NEAR_WALLET_URL,
   NEAR_HELPER_URL,
 } = process.env;
+const updateStateMinInterval = UPDATE_STATE_MIN_INTERVAL
+  ? Number(UPDATE_STATE_MIN_INTERVAL)
+  : 0.1;
 
 console.log("APPCHAIN_ID", APPCHAIN_ID);
 console.log("ANCHOR_CONTRACT_ID", ANCHOR_CONTRACT_ID);
@@ -164,79 +168,92 @@ function decodeMmrProofWrapper(rawMmrProofWrapper: any): {
 async function subscribeJustifications(appchain: ApiPromise) {
   console.log("start subscribe");
   appchain.rpc.beefy.subscribeJustifications(async (justification) => {
-    console.log("justification", JSON.stringify(justification));
-    console.log("justification encode", JSON.stringify(justification.toHex()));
-    const currBlockHash = await appchain.rpc.chain.getBlockHash(
-      justification.commitment.blockNumber
-    );
-    const rawMmrProofWrapper = await appchain.rpc.mmr.generateProof(
-      Number(justification.commitment.blockNumber) - 1,
-      currBlockHash
-    );
-    logJSON("rawMmrProofWrapper", rawMmrProofWrapper);
-    const decodedMmrProofWrapper = decodeMmrProofWrapper(rawMmrProofWrapper);
-    logJSON("decodedMmrProofWrapper", decodedMmrProofWrapper);
-
-    // const validatorProof = {
-    //   root: justification.commitment.payload.toJSON(),
-    //   proof: mmrProof.toJSON(),
-    // };
-
-    const rawAuthorities = (await appchain.query.beefy.authorities.at(
-      currBlockHash
-    )) as DetectCodec<any, any>;
-
-    const authorities = rawAuthorities.toJSON();
-    logJSON("authorities", authorities);
-    const ethAddrs = authorities.map((a: string) => publicKeyToAddress(a));
-    console.log("ethAddrs", ethAddrs);
-    const leaves = ethAddrs.map((a: string) => keccak256(a));
-    const tree = new MerkleTree(leaves, keccak256);
-    const root = tree.getRoot().toString("hex");
-    console.log("root", root);
-
-    const merkleProofs = leaves.map((leaf: any, index: number) => {
-      const proof: string[] = tree.getHexProof(leaf);
-      console.log("proof", proof);
-      const u8aProof = proof.map((hash) => toNumArray(hash));
-      const merkleProof: MerkleProof = {
-        root: toNumArray(root),
-        proof: u8aProof,
-        number_of_leaves: leaves.length,
-        leaf_index: index,
-        leaf: toNumArray(ethAddrs[index]),
-      };
-      return merkleProof;
-    });
-
-    const lightClientState = {
-      signed_commitment: toNumArray(justification.toHex()) as number[],
-      validator_proofs: merkleProofs,
-      mmr_leaf: toNumArray(rawMmrProofWrapper.leaf),
-      mmr_proof: toNumArray(rawMmrProofWrapper.proof),
-    };
-
-    const actionType = "UpdateState";
-    try {
-      await confirmAction(actionType);
-      setRelayMessagesLock(true);
-      await updateState(lightClientState);
-      setRelayMessagesLock(false);
-      await storeAction(actionType);
-    } catch (err) {
-      setRelayMessagesLock(false);
-      console.log(err);
-    }
-
-    // const simplifiedProof = convertToSimplifiedMMRProof(
-    //   blockHash,
-    //   mmrProof.leafIndex,
-    //   mmrLeaf,
-    //   mmrProof.leafCount,
-    //   mmrProof.items
-    // );
-    // console.log("simplifiedProof", JSON.stringify(simplifiedProof));
+    await handleJustification(appchain, justification);
   });
+}
+
+let lastStateUpdated = 0;
+async function handleJustification(
+  appchain: ApiPromise,
+  justification: DetectCodec<any, any>
+) {
+  console.log("justification", JSON.stringify(justification));
+  if (Date.now() - lastStateUpdated < updateStateMinInterval * 60 * 1000) {
+    console.log("skip this justification");
+    return;
+  }
+  console.log("justification encode", JSON.stringify(justification.toHex()));
+  const currBlockHash = await appchain.rpc.chain.getBlockHash(
+    justification.commitment.blockNumber
+  );
+  const rawMmrProofWrapper = await appchain.rpc.mmr.generateProof(
+    Number(justification.commitment.blockNumber) - 1,
+    currBlockHash
+  );
+  logJSON("rawMmrProofWrapper", rawMmrProofWrapper);
+  const decodedMmrProofWrapper = decodeMmrProofWrapper(rawMmrProofWrapper);
+  logJSON("decodedMmrProofWrapper", decodedMmrProofWrapper);
+
+  // const validatorProof = {
+  //   root: justification.commitment.payload.toJSON(),
+  //   proof: mmrProof.toJSON(),
+  // };
+
+  const rawAuthorities = (await appchain.query.beefy.authorities.at(
+    currBlockHash
+  )) as DetectCodec<any, any>;
+
+  const authorities = rawAuthorities.toJSON();
+  logJSON("authorities", authorities);
+  const ethAddrs = authorities.map((a: string) => publicKeyToAddress(a));
+  console.log("ethAddrs", ethAddrs);
+  const leaves = ethAddrs.map((a: string) => keccak256(a));
+  const tree = new MerkleTree(leaves, keccak256);
+  const root = tree.getRoot().toString("hex");
+  console.log("root", root);
+
+  const merkleProofs = leaves.map((leaf: any, index: number) => {
+    const proof: string[] = tree.getHexProof(leaf);
+    console.log("proof", proof);
+    const u8aProof = proof.map((hash) => toNumArray(hash));
+    const merkleProof: MerkleProof = {
+      root: toNumArray(root),
+      proof: u8aProof,
+      number_of_leaves: leaves.length,
+      leaf_index: index,
+      leaf: toNumArray(ethAddrs[index]),
+    };
+    return merkleProof;
+  });
+
+  const lightClientState = {
+    signed_commitment: toNumArray(justification.toHex()) as number[],
+    validator_proofs: merkleProofs,
+    mmr_leaf: toNumArray(rawMmrProofWrapper.leaf),
+    mmr_proof: toNumArray(rawMmrProofWrapper.proof),
+  };
+
+  const actionType = "UpdateState";
+  try {
+    await confirmAction(actionType);
+    setRelayMessagesLock(true);
+    await updateState(lightClientState);
+    setRelayMessagesLock(false);
+    await storeAction(actionType);
+    lastStateUpdated = Date.now();
+  } catch (err) {
+    setRelayMessagesLock(false);
+    console.log(err);
+  }
+
+  // const simplifiedProof = convertToSimplifiedMMRProof(
+  //   blockHash,
+  //   mmrProof.leafIndex,
+  //   mmrLeaf,
+  //   mmrProof.leafCount,
+  //   mmrProof.items
+  // );
+  // console.log("simplifiedProof", JSON.stringify(simplifiedProof));
 }
 
 async function start() {

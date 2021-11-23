@@ -54,7 +54,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     },
     encoded_messages
   );
-  const blockNumberInAnchor = await getLatestCommitmentBlockNumber();
+  const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
   const latestFinalizedHeight = getLatestFinalizedHeight();
   if (
     commitment.height >= blockNumberInAnchor ||
