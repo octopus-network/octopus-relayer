@@ -10,6 +10,7 @@ import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
 import { storeAction, confirmAction } from "./actions";
 import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
 import { updateStateMinInterval } from "./constants";
+import { MmrLeafProof } from "@polkadot/types/interfaces";
 
 let relayMessagesLock = false;
 
@@ -64,6 +65,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     return;
   }
 
+  let rawProof: MmrLeafProof | undefined = undefined;
   let messageProof: MessageProof | undefined = undefined;
   const blocksPerMin = 10;
   if (
@@ -81,7 +83,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     );
     logJSON("blockHashInAnchor", blockHashInAnchor);
     try {
-      const rawProof = await appchain.rpc.mmr.generateProof(
+      rawProof = await appchain.rpc.mmr.generateProof(
         commitment.height,
         blockHashInAnchor
       );
@@ -93,22 +95,6 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
           mmr_leaf: toNumArray(rawProof.leaf),
           mmr_proof: toNumArray(rawProof.proof),
         };
-        for (let index = 0; index < decoded_messages.length; index++) {
-          const payloadTypeString =
-            decoded_messages[index].payload_type.toString();
-          console.log("payloadTypeString", payloadTypeString);
-          await confirmAction(payloadTypeString);
-        }
-
-        const inStateCompleting = !(await tryComplete(
-          "try_complete_updating_state_of_beefy_light_client"
-        ));
-
-        console.log("inStateCompleting", inStateCompleting);
-
-        if (relayMessagesLock || inStateCompleting) {
-          return;
-        }
       } else {
         messageProof = messageProofWithoutProof(encoded_messages);
       }
@@ -126,6 +112,26 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     let txId: string = "";
     let failedCall: any = null;
     try {
+      for (let index = 0; index < decoded_messages.length; index++) {
+        const payloadTypeString =
+          decoded_messages[index].payload_type.toString();
+        console.log("payloadTypeString", payloadTypeString);
+        await confirmAction(payloadTypeString);
+      }
+
+      let inStateCompleting: boolean = false;
+      if (rawProof) {
+        inStateCompleting = !(await tryComplete(
+          "try_complete_updating_state_of_beefy_light_client"
+        ));
+
+        console.log("inStateCompleting", inStateCompleting);
+      }
+
+      if (relayMessagesLock || inStateCompleting) {
+        return;
+      }
+
       const callResult: any = await relayMessages(messageProof);
       if (callResult.transaction_outcome) {
         txId = callResult.transaction_outcome.id;
