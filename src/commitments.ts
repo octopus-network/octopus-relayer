@@ -10,6 +10,10 @@ import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
 import { storeAction, confirmAction } from "./actions";
 import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
 
+const { WITNESS_MODE } = process.env;
+const witnessMode: boolean = WITNESS_MODE ? JSON.parse(WITNESS_MODE) : false;
+console.log("witnessMode:", witnessMode);
+
 let relayMessagesLock = false;
 
 export function setRelayMessagesLock(status: boolean) {
@@ -57,92 +61,109 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
   const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
   const latestFinalizedHeight = getLatestFinalizedHeight();
   if (
-    commitment.height >= blockNumberInAnchor ||
     commitment.height > latestFinalizedHeight ||
     blockNumberInAnchor > latestFinalizedHeight
   ) {
     return;
   }
-  console.log("decoded_messages", JSON.stringify(decoded_messages));
-  console.log("blockNumberInAnchor", blockNumberInAnchor);
-  console.log("latestFinalizedHeight", latestFinalizedHeight);
-  console.log("commitment.height", commitment.height);
-  const blockHashInAnchor = await appchain.rpc.chain.getBlockHash(
-    blockNumberInAnchor
-  );
-  logJSON("blockHashInAnchor", blockHashInAnchor);
-  const rawProof = await appchain.rpc.mmr.generateProof(
-    commitment.height,
-    blockHashInAnchor
-  );
 
-  logJSON("rawProof", rawProof);
-
-  // const mmr_root = await appchain.query.mmr.rootHash.at(blockHashInAnchor);
   const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height);
   const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
-  const messageProof: MessageProof = {
-    header: toNumArray(cHeader.toHex()),
-    encoded_messages: toNumArray(encoded_messages),
-    mmr_leaf: toNumArray(rawProof.leaf),
-    mmr_proof: toNumArray(rawProof.proof),
-  };
-  let txId: string = "";
-  let failedCall: any = null;
-  try {
-    for (let index = 0; index < decoded_messages.length; index++) {
-      const payloadTypeString = decoded_messages[index].payload_type.toString();
-      console.log("payloadTypeString", payloadTypeString);
-      await confirmAction(payloadTypeString);
-    }
 
-    const inStateCompleting = !(await tryComplete(
-      "try_complete_updating_state_of_beefy_light_client"
-    ));
-
-    console.log("inStateCompleting", inStateCompleting);
-
-    if (relayMessagesLock || inStateCompleting) {
-      return;
-    }
-    const callResult: any = await relayMessages(messageProof);
-    if (callResult.transaction_outcome) {
-      txId = callResult.transaction_outcome.id;
-    }
-  } catch (e: any) {
-    if (e.transaction_outcome) {
-      console.error("handleCommitment error", e);
-      txId = e.transaction_outcome.id;
-      failedCall = e;
-    } else {
-      throw e;
-    }
-  }
-
-  let needCompletes: any = {
-    PlanNewEra: false,
-    EraPayout: false,
-  };
-
-  if (!failedCall) {
-    decoded_messages.forEach((msg: any) => {
-      if (msg.payload_type.toString() === "PlanNewEra") {
-        needCompletes.PlanNewEra = true;
-      } else if (msg.payload_type.toString() === "EraPayout") {
-        needCompletes.EraPayout = true;
-      }
-    });
-  }
-
-  if (failedCall) {
-    await markAsSent(commitment.commitment, 2, txId);
-  } else {
-    await markAsSent(commitment.commitment, 1, txId);
-    await Promise.all(
-      Object.keys(needCompletes).map(async (key) =>
-        needCompletes[key] ? await storeAction(key as ActionType) : null
-      )
+  let messageProof: MessageProof | undefined = undefined;
+  if (witnessMode && commitment.height >= blockNumberInAnchor + 10) {
+    console.log("witnessMode ===== relay messages without proofs");
+    messageProof = {
+      header: toNumArray(cHeader.toHex()),
+      encoded_messages: toNumArray(encoded_messages),
+      mmr_leaf: [] as number[],
+      mmr_proof: [] as number[],
+    };
+  } else if (commitment.height < blockNumberInAnchor) {
+    console.log("relay messages with proofs");
+    const blockHashInAnchor = await appchain.rpc.chain.getBlockHash(
+      blockNumberInAnchor
     );
+    logJSON("blockHashInAnchor", blockHashInAnchor);
+    const rawProof = await appchain.rpc.mmr.generateProof(
+      commitment.height,
+      blockHashInAnchor
+    );
+
+    logJSON("rawProof", rawProof);
+
+    // const mmr_root = await appchain.query.mmr.rootHash.at(blockHashInAnchor);
+    messageProof = {
+      header: toNumArray(cHeader.toHex()),
+      encoded_messages: toNumArray(encoded_messages),
+      mmr_leaf: toNumArray(rawProof.leaf),
+      mmr_proof: toNumArray(rawProof.proof),
+    };
+  }
+
+  if (messageProof) {
+    console.log("decoded_messages", JSON.stringify(decoded_messages));
+    console.log("blockNumberInAnchor", blockNumberInAnchor);
+    console.log("latestFinalizedHeight", latestFinalizedHeight);
+    console.log("commitment.height", commitment.height);
+    let txId: string = "";
+    let failedCall: any = null;
+    try {
+      for (let index = 0; index < decoded_messages.length; index++) {
+        const payloadTypeString =
+          decoded_messages[index].payload_type.toString();
+        console.log("payloadTypeString", payloadTypeString);
+        await confirmAction(payloadTypeString);
+      }
+
+      const inStateCompleting = !(await tryComplete(
+        "try_complete_updating_state_of_beefy_light_client"
+      ));
+
+      console.log("inStateCompleting", inStateCompleting);
+
+      if (relayMessagesLock || inStateCompleting) {
+        return;
+      }
+      const callResult: any = await relayMessages(messageProof);
+      if (callResult.transaction_outcome) {
+        txId = callResult.transaction_outcome.id;
+      }
+    } catch (e: any) {
+      if (e.transaction_outcome) {
+        console.error("handleCommitment error", e);
+        txId = e.transaction_outcome.id;
+        failedCall = e;
+      } else {
+        throw e;
+      }
+    }
+
+    let needCompletes: any = {
+      PlanNewEra: false,
+      EraPayout: false,
+    };
+
+    if (!failedCall) {
+      decoded_messages.forEach((msg: any) => {
+        if (msg.payload_type.toString() === "PlanNewEra") {
+          needCompletes.PlanNewEra = true;
+        } else if (msg.payload_type.toString() === "EraPayout") {
+          needCompletes.EraPayout = true;
+        }
+      });
+    }
+
+    if (failedCall) {
+      await markAsSent(commitment.commitment, 2, txId);
+    } else {
+      await markAsSent(commitment.commitment, 1, txId);
+      await Promise.all(
+        Object.keys(needCompletes).map(async (key) =>
+          needCompletes[key] ? await storeAction(key as ActionType) : null
+        )
+      );
+    }
   }
 }
 
