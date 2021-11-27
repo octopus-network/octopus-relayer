@@ -9,7 +9,6 @@ export RELAYER_PRIVATE_KEY=ed25519:...(Your private key)
 export APPCHAIN_ENDPOINT=ws://192.168.0.9:9944
 export START_BLOCK_HEIGHT=2
 export UPDATE_STATE_MIN_INTERVAL=60
-export WITNESS_MOD=false
 export NEAR_NODE_URL="https://rpc.testnet.near.org"
 export NEAR_WALLET_URL="https://wallet.testnet.near.org"
 export NEAR_HELPER_URL="https://helper.testnet.near.org"

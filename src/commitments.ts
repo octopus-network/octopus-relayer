@@ -10,10 +10,6 @@ import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
 import { storeAction, confirmAction } from "./actions";
 import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
 
-const { WITNESS_MODE } = process.env;
-const witnessMode: boolean = WITNESS_MODE ? JSON.parse(WITNESS_MODE) : false;
-console.log("witnessMode:", witnessMode);
-
 let relayMessagesLock = false;
 
 export function setRelayMessagesLock(status: boolean) {
@@ -67,38 +63,38 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     return;
   }
 
-  const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height);
-  const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
-
   let messageProof: MessageProof | undefined = undefined;
-  if (witnessMode && commitment.height >= blockNumberInAnchor + 10) {
-    console.log("witnessMode ===== relay messages without proofs");
-    messageProof = {
-      header: toNumArray(cHeader.toHex()),
-      encoded_messages: toNumArray(encoded_messages),
-      mmr_leaf: [] as number[],
-      mmr_proof: [] as number[],
-    };
+  if (commitment.height >= blockNumberInAnchor + 20) {
+    console.log("commitment.height >= blockNumberInAnchor + 20");
+    messageProof = messageProofWithoutProof(encoded_messages);
   } else if (commitment.height < blockNumberInAnchor) {
     console.log("relay messages with proofs");
+    const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height);
+    const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
     const blockHashInAnchor = await appchain.rpc.chain.getBlockHash(
       blockNumberInAnchor
     );
     logJSON("blockHashInAnchor", blockHashInAnchor);
-    const rawProof = await appchain.rpc.mmr.generateProof(
-      commitment.height,
-      blockHashInAnchor
-    );
-
-    logJSON("rawProof", rawProof);
-
-    // const mmr_root = await appchain.query.mmr.rootHash.at(blockHashInAnchor);
-    messageProof = {
-      header: toNumArray(cHeader.toHex()),
-      encoded_messages: toNumArray(encoded_messages),
-      mmr_leaf: toNumArray(rawProof.leaf),
-      mmr_proof: toNumArray(rawProof.proof),
-    };
+    try {
+      const rawProof = await appchain.rpc.mmr.generateProof(
+        commitment.height,
+        blockHashInAnchor
+      );
+      if (rawProof) {
+        logJSON("rawProof", rawProof);
+        messageProof = {
+          header: toNumArray(cHeader.toHex()),
+          encoded_messages: toNumArray(encoded_messages),
+          mmr_leaf: toNumArray(rawProof.leaf),
+          mmr_proof: toNumArray(rawProof.proof),
+        };
+      } else {
+        messageProof = messageProofWithoutProof(encoded_messages);
+      }
+    } catch (error) {
+      console.log("generateProof error", error);
+      messageProof = messageProofWithoutProof(encoded_messages);
+    }
   }
 
   if (messageProof) {
@@ -165,6 +161,19 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
       );
     }
   }
+}
+
+function messageProofWithoutProof(encoded_messages: string): MessageProof {
+  console.log(
+    "witnessMode ===== relay messages without proofs",
+    encoded_messages
+  );
+  return {
+    header: [] as number[],
+    encoded_messages: toNumArray(encoded_messages),
+    mmr_leaf: [] as number[],
+    mmr_proof: [] as number[],
+  };
 }
 
 async function markAsSent(commitment: string, status: number, txId: string) {
