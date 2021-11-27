@@ -2,8 +2,9 @@ import { Account } from "near-api-js";
 import { tryComplete } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import types from "./types";
-import { dbRunAsync, dbAllAsync, upsertActions } from "./db";
+import { dbRunAsync, dbAllAsync, upsertActions, dbGetAsync } from "./db";
 import { Action, ActionType } from "./interfaces";
+import { Type } from "@polkadot/types";
 
 export async function storeAction(type: ActionType): Promise<any> {
   await upsertActions({
@@ -24,6 +25,14 @@ async function actionCompleted(type: ActionType) {
 async function getActions(): Promise<Action[]> {
   const actions: Action[] = await dbAllAsync("SELECT * FROM actions");
   return actions;
+}
+
+async function getAction(type: ActionType): Promise<Action> {
+  const action: Action = await dbGetAsync(
+    `SELECT * FROM actions WHERE type == ?`,
+    [type]
+  );
+  return action;
 }
 
 async function getNotCompletedActions(): Promise<Action[]> {
@@ -103,4 +112,9 @@ export async function confirmAction(
       return true;
     }
   }
+}
+
+export async function isActionCompleted(type: ActionType) {
+  const action = await getAction(type);
+  return action ? action.status === 1 : true;
 }

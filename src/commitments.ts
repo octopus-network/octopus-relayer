@@ -7,7 +7,7 @@ import {
 } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
-import { storeAction, confirmAction } from "./actions";
+import { storeAction, confirmAction, isActionCompleted } from "./actions";
 import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
 import { updateStateMinInterval } from "./constants";
 import { MmrLeafProof } from "@polkadot/types/interfaces";
@@ -121,10 +121,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
 
       let inStateCompleting: boolean = false;
       if (rawProof) {
-        inStateCompleting = !(await tryComplete(
-          "try_complete_updating_state_of_beefy_light_client"
-        ));
-
+        inStateCompleting = !(await isActionCompleted("UpdateState"));
         console.log("inStateCompleting", inStateCompleting);
       }
 
