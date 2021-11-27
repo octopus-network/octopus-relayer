@@ -93,6 +93,22 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
           mmr_leaf: toNumArray(rawProof.leaf),
           mmr_proof: toNumArray(rawProof.proof),
         };
+        for (let index = 0; index < decoded_messages.length; index++) {
+          const payloadTypeString =
+            decoded_messages[index].payload_type.toString();
+          console.log("payloadTypeString", payloadTypeString);
+          await confirmAction(payloadTypeString);
+        }
+
+        const inStateCompleting = !(await tryComplete(
+          "try_complete_updating_state_of_beefy_light_client"
+        ));
+
+        console.log("inStateCompleting", inStateCompleting);
+
+        if (relayMessagesLock || inStateCompleting) {
+          return;
+        }
       } else {
         messageProof = messageProofWithoutProof(encoded_messages);
       }
@@ -110,22 +126,6 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     let txId: string = "";
     let failedCall: any = null;
     try {
-      for (let index = 0; index < decoded_messages.length; index++) {
-        const payloadTypeString =
-          decoded_messages[index].payload_type.toString();
-        console.log("payloadTypeString", payloadTypeString);
-        await confirmAction(payloadTypeString);
-      }
-
-      const inStateCompleting = !(await tryComplete(
-        "try_complete_updating_state_of_beefy_light_client"
-      ));
-
-      console.log("inStateCompleting", inStateCompleting);
-
-      if (relayMessagesLock || inStateCompleting) {
-        return;
-      }
       const callResult: any = await relayMessages(messageProof);
       if (callResult.transaction_outcome) {
         txId = callResult.transaction_outcome.id;
