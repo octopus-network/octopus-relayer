@@ -22,47 +22,13 @@ import {
 import { storeAction, confirmAction } from "./actions";
 import { tryCompleteActions } from "./actions";
 import { LightClientState, ActionType } from "./interfaces";
+import { appchainEndpoint, updateStateMinInterval } from "./constants";
 
 const BLOCK_SYNC_SIZE = 20;
 
-const {
-  APPCHAIN_ID,
-  ANCHOR_CONTRACT_ID,
-  RELAYER_PRIVATE_KEY,
-  APPCHAIN_ENDPOINT,
-  START_BLOCK_HEIGHT,
-  UPDATE_STATE_MIN_INTERVAL,
-  NEAR_NODE_URL,
-  NEAR_WALLET_URL,
-  NEAR_HELPER_URL,
-} = process.env;
-const updateStateMinInterval = UPDATE_STATE_MIN_INTERVAL
-  ? Number(UPDATE_STATE_MIN_INTERVAL)
-  : 0.1;
-
-console.log("APPCHAIN_ID", APPCHAIN_ID);
-console.log("ANCHOR_CONTRACT_ID", ANCHOR_CONTRACT_ID);
-console.log("RELAYER_PRIVATE_KEY", RELAYER_PRIVATE_KEY);
-console.log("APPCHAIN_ENDPOINT", APPCHAIN_ENDPOINT);
-console.log("START_BLOCK_HEIGHT", START_BLOCK_HEIGHT);
-console.log("NEAR_NODE_URL", NEAR_NODE_URL);
-console.log("NEAR_WALLET_URL", NEAR_WALLET_URL);
-console.log("NEAR_HELPER_URL", NEAR_HELPER_URL);
-
-if (
-  !APPCHAIN_ID ||
-  !ANCHOR_CONTRACT_ID ||
-  !RELAYER_PRIVATE_KEY ||
-  !APPCHAIN_ENDPOINT ||
-  !START_BLOCK_HEIGHT
-) {
-  console.log("[EXIT] Missing parameters!");
-  process.exit(0);
-}
-
 async function init() {
   initDb();
-  const wsProvider = new WsProvider(APPCHAIN_ENDPOINT);
+  const wsProvider = new WsProvider(appchainEndpoint);
   const appchain = await ApiPromise.create({
     provider: wsProvider,
     types,

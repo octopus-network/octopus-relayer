@@ -9,6 +9,7 @@ import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
 import { storeAction, confirmAction } from "./actions";
 import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
+import { updateStateMinInterval } from "./constants";
 
 let relayMessagesLock = false;
 
@@ -64,8 +65,12 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
   }
 
   let messageProof: MessageProof | undefined = undefined;
-  if (commitment.height >= blockNumberInAnchor + 20) {
-    console.log("commitment.height >= blockNumberInAnchor + 20");
+  const blocksPerMin = 10;
+  if (
+    commitment.height >
+    blockNumberInAnchor + blocksPerMin * (updateStateMinInterval + 1)
+  ) {
+    console.log("update_state not in time, use empty proofs");
     messageProof = messageProofWithoutProof(encoded_messages);
   } else if (commitment.height < blockNumberInAnchor) {
     console.log("relay messages with proofs");
@@ -80,8 +85,8 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
         commitment.height,
         blockHashInAnchor
       );
+      logJSON("rawProof", rawProof);
       if (rawProof) {
-        logJSON("rawProof", rawProof);
         messageProof = {
           header: toNumArray(cHeader.toHex()),
           encoded_messages: toNumArray(encoded_messages),

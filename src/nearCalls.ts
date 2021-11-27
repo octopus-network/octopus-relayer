@@ -7,19 +7,18 @@ const util = require("util");
 
 const DEFAULT_GAS = new BN("300000000000000");
 
-const {
-  APPCHAIN_ID,
-  ANCHOR_CONTRACT_ID,
-  RELAYER_PRIVATE_KEY,
-  NEAR_NODE_URL,
-  NEAR_WALLET_URL,
-  NEAR_HELPER_URL,
-} = process.env;
+import {
+  anchorContractId,
+  relayerPrivateKey,
+  nearNodeUrl,
+  nearWalletUrl,
+  nearHelperUrl,
+} from "./constants";
 
 let account: Account;
 
 export async function initNearRpc() {
-  const keyPair = utils.KeyPair.fromString(RELAYER_PRIVATE_KEY as string);
+  const keyPair = utils.KeyPair.fromString(relayerPrivateKey as string);
 
   const keyStore = new keyStores.InMemoryKeyStore();
   keyStore.setKey("testnet", "test-relayer.testnet", keyPair);
@@ -27,9 +26,9 @@ export async function initNearRpc() {
   const near = await connect({
     networkId: "testnet",
     keyStore,
-    nodeUrl: NEAR_NODE_URL as string,
-    walletUrl: NEAR_WALLET_URL,
-    helperUrl: NEAR_HELPER_URL,
+    nodeUrl: nearNodeUrl as string,
+    walletUrl: nearWalletUrl,
+    helperUrl: nearHelperUrl,
   });
   account = await near.account("test-relayer.testnet");
   return account;
@@ -40,7 +39,7 @@ export async function relayMessages(args: MessageProof) {
   console.log("\x1b[34m%s\x1b[0m", JSON.stringify(args));
   console.log("------------------------------------");
   return await account.functionCall({
-    contractId: ANCHOR_CONTRACT_ID as string,
+    contractId: anchorContractId as string,
     methodName: "verify_and_apply_appchain_messages",
     args,
     gas: DEFAULT_GAS,
@@ -53,7 +52,7 @@ export async function updateState(args: LightClientState) {
   console.log("\x1b[32m%s\x1b[0m", JSON.stringify(args));
   console.log("===================================");
   return await account.functionCall({
-    contractId: ANCHOR_CONTRACT_ID as string,
+    contractId: anchorContractId as string,
     methodName: "start_updating_state_of_beefy_light_client",
     args,
     gas: DEFAULT_GAS,
@@ -63,7 +62,7 @@ export async function updateState(args: LightClientState) {
 
 export async function getLatestCommitmentBlockNumber() {
   const latest_commitment = await account.viewFunction(
-    ANCHOR_CONTRACT_ID as string,
+    anchorContractId as string,
     "get_latest_commitment_of_appchain",
     {}
   );
@@ -73,7 +72,7 @@ export async function getLatestCommitmentBlockNumber() {
 export async function tryComplete(methodName: string) {
   console.log("tryComplete", methodName);
   const tryCompleteResult: any = await account.functionCall({
-    contractId: ANCHOR_CONTRACT_ID as string,
+    contractId: anchorContractId as string,
     methodName,
     args: {},
     gas: DEFAULT_GAS,
@@ -94,7 +93,7 @@ export async function tryComplete(methodName: string) {
 // export async function viewComplete(methodName: string) {
 //   console.log("viewComplete", methodName);
 //   const tryCompleteResult: any = await account.viewFunction(
-//     ANCHOR_CONTRACT_ID as string,
+//     anchorContractId as string,
 //     methodName,
 //     {}
 //   );
