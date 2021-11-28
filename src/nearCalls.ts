@@ -90,12 +90,11 @@ export async function tryComplete(methodName: string) {
   return isOk;
 }
 
-// export async function viewComplete(methodName: string) {
-//   console.log("viewComplete", methodName);
-//   const tryCompleteResult: any = await account.viewFunction(
-//     anchorContractId as string,
-//     methodName,
-//     {}
-//   );
-//   return tryCompleteResult;
-// }
+export async function getAnchorSettings() {
+  const anchorSettings = await account.viewFunction(
+    anchorContractId as string,
+    "get_anchor_settings",
+    {}
+  );
+  return anchorSettings;
+}

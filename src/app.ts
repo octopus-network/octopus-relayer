@@ -19,7 +19,11 @@ import {
   handleCommitments,
   setRelayMessagesLock,
 } from "./commitments";
-import { storeAction, confirmAction } from "./actions";
+import {
+  storeAction,
+  confirmAction,
+  checkAnchorIsWitnessMode,
+} from "./actions";
 import { tryCompleteActions } from "./actions";
 import { LightClientState, ActionType } from "./interfaces";
 import { appchainEndpoint, updateStateMinInterval } from "./constants";
@@ -144,8 +148,16 @@ async function handleJustification(
   justification: DetectCodec<any, any>
 ) {
   console.log("justification", JSON.stringify(justification));
-  if (Date.now() - lastStateUpdated < updateStateMinInterval * 60 * 1000) {
-    console.log("skip this justification");
+  const isWitnessMode = await checkAnchorIsWitnessMode();
+  const inInterval =
+    Date.now() - lastStateUpdated < updateStateMinInterval * 60 * 1000;
+
+  if (isWitnessMode) {
+    console.log("skip this justification. Reason: anchor is witness-mode");
+    return;
+  }
+  if (inInterval) {
+    console.log("skip this justification. Reason: in interval");
     return;
   }
   console.log("justification encode", JSON.stringify(justification.toHex()));
