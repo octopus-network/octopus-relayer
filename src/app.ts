@@ -33,10 +33,20 @@ const BLOCK_SYNC_SIZE = 20;
 async function init() {
   initDb();
   const wsProvider = new WsProvider(appchainEndpoint);
+  wsProvider.on("connected", () => console.log("provider", "connected"));
+  wsProvider.on("disconnected", () => console.log("provider", "connected"));
+  wsProvider.on("error", (error) =>
+    console.log("provider", "error", JSON.stringify(error))
+  );
   const appchain = await ApiPromise.create({
     provider: wsProvider,
     types,
   });
+  appchain.on("disconnected", () => console.log("api", "disconnected"));
+  appchain.on("connected", () => console.log("api", "connected"));
+  appchain.on("error", (error) =>
+    console.log("api", "error", JSON.stringify(error))
+  );
   const account = await initNearRpc();
   return { appchain, account };
 }
