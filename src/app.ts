@@ -32,7 +32,7 @@ const BLOCK_SYNC_SIZE = 20;
 
 async function init() {
   initDb();
-  const wsProvider = new WsProvider(appchainEndpoint);
+  const wsProvider = new WsProvider(appchainEndpoint, 5 * 60 * 1000);
   wsProvider.on("connected", () => console.log("provider", "connected"));
   wsProvider.on("disconnected", () => console.log("provider", "connected"));
   wsProvider.on("error", (error) =>
@@ -42,6 +42,10 @@ async function init() {
     provider: wsProvider,
     types,
   });
+  setInterval(
+    () => console.log("appchain api connection: ", appchain.isConnected),
+    60 * 1000
+  );
   appchain.on("disconnected", () => console.log("api", "disconnected"));
   appchain.on("connected", () => console.log("api", "connected"));
   appchain.on("error", (error) =>

@@ -20,15 +20,17 @@ export function setRelayMessagesLock(status: boolean) {
 
 export async function handleCommitments(appchain: ApiPromise) {
   try {
-    const nextHeight = await getNextHeight();
-    const currentHeight = nextHeight - 1;
-    const unMarkedCommitments = await getUnmarkedCommitments(currentHeight);
-    if (unMarkedCommitments.length > 0) {
-      unMarkedCommitments;
-      // Use try-catch here instead of in handleCommitment for issuring the excecution order.
-      for (let index = 0; index < unMarkedCommitments.length; index++) {
-        // Excecute by order.
-        await handleCommitment(unMarkedCommitments[index], appchain);
+    if (appchain.isConnected) {
+      const nextHeight = await getNextHeight();
+      const currentHeight = nextHeight - 1;
+      const unMarkedCommitments = await getUnmarkedCommitments(currentHeight);
+      if (unMarkedCommitments.length > 0) {
+        unMarkedCommitments;
+        // Use try-catch here instead of in handleCommitment for issuring the excecution order.
+        for (let index = 0; index < unMarkedCommitments.length; index++) {
+          // Excecute by order.
+          await handleCommitment(unMarkedCommitments[index], appchain);
+        }
       }
     }
   } catch (e) {
