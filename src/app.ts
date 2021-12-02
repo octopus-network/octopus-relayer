@@ -29,6 +29,7 @@ import { LightClientState, ActionType } from "./interfaces";
 import { appchainEndpoint, updateStateMinInterval } from "./constants";
 
 const BLOCK_SYNC_SIZE = 20;
+const BLOCK_LOG_SIZE = 100;
 
 async function init() {
   initDb();
@@ -42,10 +43,14 @@ async function init() {
     provider: wsProvider,
     types,
   });
-  setInterval(
-    () => console.log("appchain api connection: ", appchain.isConnected),
-    60 * 1000
-  );
+
+  let lastConnectionLog = false;
+  setInterval(() => {
+    if (appchain.isConnected != lastConnectionLog) {
+      console.log("appchain api connection: ", appchain.isConnected);
+      lastConnectionLog = appchain.isConnected;
+    }
+  }, 1000);
   appchain.on("disconnected", () => console.log("api", "disconnected"));
   appchain.on("connected", () => console.log("api", "connected"));
   appchain.on("error", (error) =>
@@ -55,12 +60,16 @@ async function init() {
   return { appchain, account };
 }
 
+let lastSyncBlocksLog = 0;
 async function syncBlocks(appchain: ApiPromise) {
   try {
     const nextHeight = await getNextHeight();
     const latestFinalizedHeight = getLatestFinalizedHeight();
     if (nextHeight <= latestFinalizedHeight) {
-      console.log("nextHeight", nextHeight);
+      if (nextHeight - lastSyncBlocksLog >= BLOCK_LOG_SIZE) {
+        console.log("nextHeight", nextHeight);
+        lastSyncBlocksLog = nextHeight;
+      }
       if (nextHeight <= latestFinalizedHeight - BLOCK_SYNC_SIZE) {
         const promises = new Array(BLOCK_SYNC_SIZE)
           .fill(1)
