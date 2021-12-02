@@ -32,7 +32,7 @@ const BLOCK_SYNC_SIZE = 20;
 
 async function init() {
   initDb();
-  const wsProvider = new WsProvider(appchainEndpoint, 5 * 60 * 1000);
+  const wsProvider = new WsProvider(appchainEndpoint, 60 * 1000);
   wsProvider.on("connected", () => console.log("provider", "connected"));
   wsProvider.on("disconnected", () => console.log("provider", "connected"));
   wsProvider.on("error", (error) =>
@@ -56,41 +56,28 @@ async function init() {
 }
 
 async function syncBlocks(appchain: ApiPromise) {
-  const nextHeight = await getNextHeight();
-  const latestFinalizedHeight = getLatestFinalizedHeight();
-  if (nextHeight > latestFinalizedHeight) {
-    syncBlocks(appchain);
-  } else {
-    console.log("nextHeight", nextHeight);
-    if (nextHeight <= latestFinalizedHeight - BLOCK_SYNC_SIZE) {
-      const promises = new Array(BLOCK_SYNC_SIZE)
-        .fill(1)
-        .map(async (_, index) => {
-          await syncBlock(appchain, nextHeight + index);
-        });
-      Promise.all(promises).then(
-        async () => {
-          try {
-            await updateSyncedBlock(nextHeight + BLOCK_SYNC_SIZE - 1);
-          } catch (e) {
-            console.error("updateSyncedBlock error", e);
-          }
-          syncBlocks(appchain);
-        },
-        (e) => {
-          console.error("syncBlocks error", e);
-          syncBlocks(appchain);
-        }
-      );
-    } else {
-      try {
+  try {
+    const nextHeight = await getNextHeight();
+    const latestFinalizedHeight = getLatestFinalizedHeight();
+    if (nextHeight <= latestFinalizedHeight) {
+      console.log("nextHeight", nextHeight);
+      if (nextHeight <= latestFinalizedHeight - BLOCK_SYNC_SIZE) {
+        const promises = new Array(BLOCK_SYNC_SIZE)
+          .fill(1)
+          .map(async (_, index) => {
+            await syncBlock(appchain, nextHeight + index);
+          });
+        await Promise.all(promises);
+        await updateSyncedBlock(nextHeight + BLOCK_SYNC_SIZE - 1);
+      } else {
         await syncBlock(appchain, nextHeight);
         await updateSyncedBlock(nextHeight);
-      } catch (e) {
-        console.error("syncBlocks error", e);
       }
-      syncBlocks(appchain);
     }
+    setTimeout(() => syncBlocks(appchain), 1000);
+  } catch (e) {
+    console.error("syncBlocks error", e);
+    setTimeout(() => syncBlocks(appchain), 3000);
   }
 }
 
