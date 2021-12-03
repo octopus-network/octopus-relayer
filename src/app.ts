@@ -1,4 +1,5 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
+import { Account } from "near-api-js";
 import { DetectCodec } from "@polkadot/types/types";
 import { decodeData, logJSON, toNumArray } from "./utils";
 const keccak256 = require("keccak256");
@@ -12,7 +13,7 @@ import {
   getNextHeight,
   getLatestFinalizedHeight,
   updateSyncedBlock,
-  syncFinalizedHeights,
+  subscribeFinalizedHeights,
 } from "./blockHeights";
 import {
   storeCommitment,
@@ -31,11 +32,13 @@ import { appchainEndpoint, updateStateMinInterval } from "./constants";
 const BLOCK_SYNC_SIZE = 20;
 const BLOCK_LOG_SIZE = 100;
 
-async function init() {
+async function start() {
   initDb();
+  const account = await initNearRpc();
+
   const wsProvider = new WsProvider(appchainEndpoint, 60 * 1000);
-  wsProvider.on("connected", () => console.log("provider", "connected"));
-  wsProvider.on("disconnected", () => console.log("provider", "connected"));
+  wsProvider.on("connected", () => console.log("provider connected"));
+  wsProvider.on("disconnected", () => console.log("provider", "disconnected"));
   wsProvider.on("error", (error) =>
     console.log("provider", "error", JSON.stringify(error))
   );
@@ -44,49 +47,72 @@ async function init() {
     types,
   });
 
-  let lastConnectionLog = false;
-  setInterval(() => {
-    if (appchain.isConnected != lastConnectionLog) {
-      console.log("appchain api connection: ", appchain.isConnected);
-      lastConnectionLog = appchain.isConnected;
-    }
-  }, 1000);
-  appchain.on("disconnected", () => console.log("api", "disconnected"));
-  appchain.on("connected", () => console.log("api", "connected"));
+  appchain.on(
+    "connected",
+    async () => await switchAppchainConnection(account, appchain)
+  );
+  appchain.on(
+    "disconnected",
+    async () => await switchAppchainConnection(account, appchain)
+  );
   appchain.on("error", (error) =>
     console.log("api", "error", JSON.stringify(error))
   );
-  const account = await initNearRpc();
   return { appchain, account };
+}
+
+let lastConnectionLog = false;
+let unsubscribeJustifications: any = () => {};
+let unsubscribeFinalizedHeights: any = () => {};
+async function switchAppchainConnection(
+  account: Account,
+  appchain: ApiPromise
+) {
+  if (appchain.isConnected != lastConnectionLog) {
+    console.log("appchain api connection: ", appchain.isConnected);
+    lastConnectionLog = appchain.isConnected;
+    if (appchain.isConnected) {
+      unsubscribeJustifications = subscribeJustifications(appchain);
+      unsubscribeFinalizedHeights = subscribeFinalizedHeights(appchain);
+      syncBlocks(appchain);
+      handleCommitments(appchain);
+      tryCompleteActions(account, appchain);
+    } else {
+      unsubscribeJustifications();
+      unsubscribeFinalizedHeights();
+    }
+  }
 }
 
 let lastSyncBlocksLog = 0;
 async function syncBlocks(appchain: ApiPromise) {
-  try {
-    const nextHeight = await getNextHeight();
-    const latestFinalizedHeight = getLatestFinalizedHeight();
-    if (nextHeight <= latestFinalizedHeight) {
-      if (nextHeight - lastSyncBlocksLog >= BLOCK_LOG_SIZE) {
-        console.log("nextHeight", nextHeight);
-        lastSyncBlocksLog = nextHeight;
+  if (appchain.isConnected) {
+    try {
+      const nextHeight = await getNextHeight();
+      const latestFinalizedHeight = getLatestFinalizedHeight();
+      if (nextHeight <= latestFinalizedHeight) {
+        if (nextHeight - lastSyncBlocksLog >= BLOCK_LOG_SIZE) {
+          console.log("nextHeight", nextHeight);
+          lastSyncBlocksLog = nextHeight;
+        }
+        if (nextHeight <= latestFinalizedHeight - BLOCK_SYNC_SIZE) {
+          const promises = new Array(BLOCK_SYNC_SIZE)
+            .fill(1)
+            .map(async (_, index) => {
+              await syncBlock(appchain, nextHeight + index);
+            });
+          await Promise.all(promises);
+          await updateSyncedBlock(nextHeight + BLOCK_SYNC_SIZE - 1);
+        } else {
+          await syncBlock(appchain, nextHeight);
+          await updateSyncedBlock(nextHeight);
+        }
       }
-      if (nextHeight <= latestFinalizedHeight - BLOCK_SYNC_SIZE) {
-        const promises = new Array(BLOCK_SYNC_SIZE)
-          .fill(1)
-          .map(async (_, index) => {
-            await syncBlock(appchain, nextHeight + index);
-          });
-        await Promise.all(promises);
-        await updateSyncedBlock(nextHeight + BLOCK_SYNC_SIZE - 1);
-      } else {
-        await syncBlock(appchain, nextHeight);
-        await updateSyncedBlock(nextHeight);
-      }
+      setTimeout(() => syncBlocks(appchain), 1000);
+    } catch (e) {
+      console.error("syncBlocks error", e);
+      setTimeout(() => syncBlocks(appchain), 3000);
     }
-    setTimeout(() => syncBlocks(appchain), 1000);
-  } catch (e) {
-    console.error("syncBlocks error", e);
-    setTimeout(() => syncBlocks(appchain), 3000);
   }
 }
 
@@ -145,9 +171,9 @@ function decodeMmrProofWrapper(rawMmrProofWrapper: any): {
   };
 }
 
-async function subscribeJustifications(appchain: ApiPromise) {
+function subscribeJustifications(appchain: ApiPromise) {
   console.log("start subscribe");
-  appchain.rpc.beefy.subscribeJustifications(async (justification) => {
+  return appchain.rpc.beefy.subscribeJustifications(async (justification) => {
     await handleJustification(appchain, justification);
   });
 }
@@ -244,17 +270,7 @@ async function handleJustification(
   // console.log("simplifiedProof", JSON.stringify(simplifiedProof));
 }
 
-async function start() {
-  const { appchain, account } = await init();
-
-  subscribeJustifications(appchain);
-  syncBlocks(appchain);
-  handleCommitments(appchain);
-  tryCompleteActions(account);
-  syncFinalizedHeights(appchain);
-}
-
 start().catch((error) => {
-  console.error(error);
+  console.error("error catch in start", error);
   process.exit(-1);
 });

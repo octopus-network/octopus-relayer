@@ -13,8 +13,8 @@ export function getLatestFinalizedHeight() {
   return latestFinalizedHeight;
 }
 
-export async function syncFinalizedHeights(appchain: ApiPromise) {
-  appchain.rpc.chain.subscribeFinalizedHeads(async (header) => {
+export async function subscribeFinalizedHeights(appchain: ApiPromise) {
+  return appchain.rpc.chain.subscribeFinalizedHeads(async (header) => {
     latestFinalizedHeight = header.number.toNumber();
   });
 }

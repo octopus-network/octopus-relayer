@@ -19,8 +19,8 @@ export function setRelayMessagesLock(status: boolean) {
 }
 
 export async function handleCommitments(appchain: ApiPromise) {
-  try {
-    if (appchain.isConnected) {
+  if (appchain.isConnected) {
+    try {
       const nextHeight = await getNextHeight();
       const currentHeight = nextHeight - 1;
       const unMarkedCommitments = await getUnmarkedCommitments(currentHeight);
@@ -32,11 +32,11 @@ export async function handleCommitments(appchain: ApiPromise) {
           await handleCommitment(unMarkedCommitments[index], appchain);
         }
       }
+    } catch (e) {
+      console.error("commitments handling failed", e);
     }
-  } catch (e) {
-    console.error("commitments handling failed", e);
+    handleCommitments(appchain);
   }
-  handleCommitments(appchain);
 }
 
 async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {

@@ -1,4 +1,5 @@
 import { Account } from "near-api-js";
+import { ApiPromise } from "@polkadot/api";
 import { tryComplete, getAnchorSettings } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import types from "./types";
@@ -42,42 +43,47 @@ async function getNotCompletedActions(): Promise<Action[]> {
   return actions;
 }
 
-export async function tryCompleteActions(account: Account) {
-  const actions: Action[] = await getNotCompletedActions();
-  for (let index = 0; index < actions.length; index++) {
-    try {
-      const { type } = actions[index];
-      if (type === "PlanNewEra") {
-        const switchingEraResult = await tryComplete(
-          "try_complete_switching_era"
-        );
-        if (switchingEraResult) {
-          await actionCompleted(type);
+export async function tryCompleteActions(
+  account: Account,
+  appchain: ApiPromise
+) {
+  if (appchain.isConnected) {
+    const actions: Action[] = await getNotCompletedActions();
+    for (let index = 0; index < actions.length; index++) {
+      try {
+        const { type } = actions[index];
+        if (type === "PlanNewEra") {
+          const switchingEraResult = await tryComplete(
+            "try_complete_switching_era"
+          );
+          if (switchingEraResult) {
+            await actionCompleted(type);
+          }
         }
-      }
-      if (type === "EraPayout") {
-        const distributingRewardtResult = await tryComplete(
-          "try_complete_distributing_reward"
-        );
-        if (distributingRewardtResult) {
-          await actionCompleted(type);
+        if (type === "EraPayout") {
+          const distributingRewardtResult = await tryComplete(
+            "try_complete_distributing_reward"
+          );
+          if (distributingRewardtResult) {
+            await actionCompleted(type);
+          }
         }
-      }
-      if (type === "UpdateState") {
-        const updatetStateResult = await tryComplete(
-          "try_complete_updating_state_of_beefy_light_client"
-        );
-        if (updatetStateResult) {
-          await actionCompleted(type);
+        if (type === "UpdateState") {
+          const updatetStateResult = await tryComplete(
+            "try_complete_updating_state_of_beefy_light_client"
+          );
+          if (updatetStateResult) {
+            await actionCompleted(type);
+          }
         }
+      } catch (e) {
+        console.error("tryCompleteActions failed", e);
       }
-    } catch (e) {
-      console.error("tryCompleteActions failed", e);
     }
+    setTimeout(() => {
+      tryCompleteActions(account, appchain);
+    }, 200);
   }
-  setTimeout(() => {
-    tryCompleteActions(account);
-  }, 200);
 }
 
 export async function confirmAction(
