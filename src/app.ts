@@ -47,13 +47,11 @@ async function start() {
     types,
   });
 
-  appchain.on(
-    "connected",
-    async () => await switchAppchainConnection(account, appchain)
-  );
-  appchain.on(
-    "disconnected",
-    async () => await switchAppchainConnection(account, appchain)
+  switchAppchainConnection(account, appchain);
+
+  appchain.on("connected", () => switchAppchainConnection(account, appchain));
+  appchain.on("disconnected", () =>
+    switchAppchainConnection(account, appchain)
   );
   appchain.on("error", (error) =>
     console.log("api", "error", JSON.stringify(error))
@@ -68,8 +66,9 @@ async function switchAppchainConnection(
   account: Account,
   appchain: ApiPromise
 ) {
+  console.log("appchain api connection: ", appchain.isConnected);
   if (appchain.isConnected != lastConnectionLog) {
-    console.log("appchain api connection: ", appchain.isConnected);
+    console.log("appchain api switching");
     lastConnectionLog = appchain.isConnected;
     if (appchain.isConnected) {
       unsubscribeJustifications = subscribeJustifications(appchain);
