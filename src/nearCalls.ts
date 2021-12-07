@@ -9,6 +9,7 @@ const DEFAULT_GAS = new BN("300000000000000");
 
 import {
   anchorContractId,
+  nodeEnv,
   relayerId,
   relayerPrivateKey,
   nearNodeUrl,
@@ -22,10 +23,10 @@ export async function initNearRpc() {
   const keyPair = utils.KeyPair.fromString(relayerPrivateKey as string);
 
   const keyStore = new keyStores.InMemoryKeyStore();
-  keyStore.setKey("testnet", relayerId, keyPair);
+  keyStore.setKey(nodeEnv, relayerId, keyPair);
 
   const near = await connect({
-    networkId: "testnet",
+    networkId: nodeEnv,
     keyStore,
     nodeUrl: nearNodeUrl as string,
     walletUrl: nearWalletUrl,

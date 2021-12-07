@@ -1,6 +1,7 @@
 const {
   APPCHAIN_ID,
   ANCHOR_CONTRACT_ID,
+  NODE_ENV,
   RELAYER_ID,
   RELAYER_PRIVATE_KEY,
   APPCHAIN_ENDPOINT,
@@ -13,6 +14,7 @@ const {
 
 console.log("APPCHAIN_ID", APPCHAIN_ID);
 console.log("ANCHOR_CONTRACT_ID", ANCHOR_CONTRACT_ID);
+console.log("NODE_ENV", NODE_ENV);
 console.log("RELAYER_ID", RELAYER_ID);
 console.log("RELAYER_PRIVATE_KEY", RELAYER_PRIVATE_KEY);
 console.log("APPCHAIN_ENDPOINT", APPCHAIN_ENDPOINT);
@@ -25,6 +27,7 @@ console.log("NEAR_HELPER_URL", NEAR_HELPER_URL);
 if (
   !APPCHAIN_ID ||
   !ANCHOR_CONTRACT_ID ||
+  !NODE_ENV ||
   !RELAYER_ID ||
   !RELAYER_PRIVATE_KEY ||
   !APPCHAIN_ENDPOINT ||
@@ -35,6 +38,7 @@ if (
 }
 export const appchainId = APPCHAIN_ID;
 export const anchorContractId = ANCHOR_CONTRACT_ID;
+export const nodeEnv = NODE_ENV;
 export const relayerId = RELAYER_ID;
 export const relayerPrivateKey = RELAYER_PRIVATE_KEY;
 export const appchainEndpoint = APPCHAIN_ENDPOINT;

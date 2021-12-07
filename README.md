@@ -5,6 +5,7 @@
 ```
 export APPCHAIN_ID=ychain
 export ANCHOR_CONTRACT_ID=dev-ychain.testnet
+export NODE_ENV=testnet
 export RELAYER_ID=...(Your private key)
 export RELAYER_PRIVATE_KEY=ed25519:...(Your private key)
 export APPCHAIN_ENDPOINT=ws://192.168.0.9:9944
