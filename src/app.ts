@@ -36,47 +36,61 @@ async function start() {
   initDb();
   const account = await initNearRpc();
 
-  const wsProvider = new WsProvider(appchainEndpoint, 60 * 1000);
-  wsProvider.on("connected", () => console.log("provider connected"));
-  wsProvider.on("disconnected", () => console.log("provider", "disconnected"));
-  wsProvider.on("error", (error) =>
-    console.log("provider", "error", JSON.stringify(error))
-  );
+  const wsProvider = new WsProvider(appchainEndpoint, 10 * 1000);
   const appchain = await ApiPromise.create({
     provider: wsProvider,
     types,
   });
 
-  switchAppchainConnection(account, appchain);
-
-  appchain.on("connected", () => switchAppchainConnection(account, appchain));
+  wsProvider.on("connected", () =>
+    checkSubscription(account, wsProvider, appchain)
+  );
+  wsProvider.on("disconnected", () =>
+    checkSubscription(account, wsProvider, appchain)
+  );
+  wsProvider.on("error", (error) =>
+    console.log("provider", "error", JSON.stringify(error))
+  );
+  appchain.on("connected", () =>
+    checkSubscription(account, wsProvider, appchain)
+  );
   appchain.on("disconnected", () =>
-    switchAppchainConnection(account, appchain)
+    checkSubscription(account, wsProvider, appchain)
   );
   appchain.on("error", (error) =>
     console.log("api", "error", JSON.stringify(error))
   );
+  checkSubscription(account, wsProvider, appchain);
   return { appchain, account };
 }
 
-let lastConnectionLog = false;
+let lastProviderConnectionLog = false;
+let lastAppchainConnectionLog = false;
 let unsubscribeJustifications: any = () => {};
 let unsubscribeFinalizedHeights: any = () => {};
-async function switchAppchainConnection(
+async function checkSubscription(
   account: Account,
+  provider: WsProvider,
   appchain: ApiPromise
 ) {
-  console.log("appchain api connection: ", appchain.isConnected);
-  if (appchain.isConnected != lastConnectionLog) {
-    console.log("appchain api switching");
-    lastConnectionLog = appchain.isConnected;
-    if (appchain.isConnected) {
-      unsubscribeJustifications = subscribeJustifications(appchain);
-      unsubscribeFinalizedHeights = subscribeFinalizedHeights(appchain);
+  if (
+    provider.isConnected != lastProviderConnectionLog ||
+    appchain.isConnected != lastAppchainConnectionLog
+  ) {
+    console.log("appchain connection switching");
+    console.log("provider connection: ", provider.isConnected);
+    console.log("appchain connection: ", appchain.isConnected);
+    lastProviderConnectionLog = provider.isConnected;
+    lastAppchainConnectionLog = appchain.isConnected;
+    if (appchain.isConnected && provider.isConnected) {
+      console.log("start subscribe");
+      unsubscribeJustifications = await subscribeJustifications(appchain);
+      unsubscribeFinalizedHeights = await subscribeFinalizedHeights(appchain);
       syncBlocks(appchain);
       handleCommitments(appchain);
       tryCompleteActions(account, appchain);
     } else {
+      console.log("unsubscribe");
       unsubscribeJustifications();
       unsubscribeFinalizedHeights();
     }
@@ -170,11 +184,12 @@ function decodeMmrProofWrapper(rawMmrProofWrapper: any): {
   };
 }
 
-function subscribeJustifications(appchain: ApiPromise) {
-  console.log("start subscribe");
-  return appchain.rpc.beefy.subscribeJustifications(async (justification) => {
-    await handleJustification(appchain, justification);
-  });
+async function subscribeJustifications(appchain: ApiPromise) {
+  return await appchain.rpc.beefy.subscribeJustifications(
+    async (justification) => {
+      await handleJustification(appchain, justification);
+    }
+  );
 }
 
 let lastStateUpdated = 0;

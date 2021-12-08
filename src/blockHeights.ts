@@ -14,7 +14,7 @@ export function getLatestFinalizedHeight() {
 }
 
 export async function subscribeFinalizedHeights(appchain: ApiPromise) {
-  return appchain.rpc.chain.subscribeFinalizedHeads(async (header) => {
+  return await appchain.rpc.chain.subscribeFinalizedHeads(async (header) => {
     latestFinalizedHeight = header.number.toNumber();
   });
 }
