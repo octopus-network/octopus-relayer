@@ -84,11 +84,11 @@ async function checkSubscription(
     lastAppchainConnectionLog = appchain.isConnected;
     if (appchain.isConnected && provider.isConnected) {
       console.log("start subscribe");
-      unsubscribeJustifications = await subscribeJustifications(appchain);
-      unsubscribeFinalizedHeights = await subscribeFinalizedHeights(appchain);
       syncBlocks(appchain);
       handleCommitments(appchain);
       tryCompleteActions(account, appchain);
+      unsubscribeFinalizedHeights = await subscribeFinalizedHeights(appchain);
+      unsubscribeJustifications = await subscribeJustifications(appchain);
     } else {
       console.log("unsubscribe");
       unsubscribeJustifications();
