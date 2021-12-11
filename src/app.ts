@@ -36,7 +36,7 @@ async function start() {
   initDb();
   const account = await initNearRpc();
 
-  const wsProvider = new WsProvider(appchainEndpoint, 10 * 1000);
+  const wsProvider = new WsProvider(appchainEndpoint, 5 * 60 * 1000);
   const appchain = await ApiPromise.create({
     provider: wsProvider,
     types,
@@ -77,7 +77,7 @@ async function checkSubscription(
     provider.isConnected != lastProviderConnectionLog ||
     appchain.isConnected != lastAppchainConnectionLog
   ) {
-    console.log("appchain connection switching");
+    console.log("checkSubscription");
     console.log("provider connection: ", provider.isConnected);
     console.log("appchain connection: ", appchain.isConnected);
     lastProviderConnectionLog = provider.isConnected;
