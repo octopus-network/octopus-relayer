@@ -19,6 +19,11 @@ export function setRelayMessagesLock(status: boolean) {
 }
 
 export async function handleCommitments(appchain: ApiPromise) {
+  // set expired time for the whole async block
+  const timer = setTimeout(() => {
+    console.error("handleCommitments expired");
+    handleCommitments(appchain);
+  }, 2 * 60 * 1000);
   if (appchain.isConnected) {
     try {
       const nextHeight = await getNextHeight();
@@ -32,10 +37,13 @@ export async function handleCommitments(appchain: ApiPromise) {
           await handleCommitment(unMarkedCommitments[index], appchain);
         }
       }
+      setTimeout(() => handleCommitments(appchain), 1000);
+      clearTimeout(timer);
     } catch (e) {
       console.error("commitments handling failed", e);
+      setTimeout(() => handleCommitments(appchain), 10 * 1000);
+      clearTimeout(timer);
     }
-    handleCommitments(appchain);
   }
 }
 

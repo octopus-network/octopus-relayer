@@ -99,6 +99,12 @@ async function checkSubscription(
 
 let lastSyncBlocksLog = 0;
 async function syncBlocks(appchain: ApiPromise) {
+  // set expired time for the whole async block
+  const timer = setTimeout(() => {
+    console.error("syncBlocks expired");
+    syncBlocks(appchain);
+  }, 2 * 60 * 1000);
+
   if (appchain.isConnected) {
     try {
       const nextHeight = await getNextHeight();
@@ -122,9 +128,11 @@ async function syncBlocks(appchain: ApiPromise) {
         }
       }
       setTimeout(() => syncBlocks(appchain), 1000);
+      clearTimeout(timer);
     } catch (e) {
       console.error("syncBlocks error", e);
-      setTimeout(() => syncBlocks(appchain), 3000);
+      setTimeout(() => syncBlocks(appchain), 10 * 1000);
+      clearTimeout(timer);
     }
   }
 }
