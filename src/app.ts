@@ -66,8 +66,6 @@ async function start() {
 
 let lastProviderConnectionLog = false;
 let lastAppchainConnectionLog = false;
-let unsubscribeJustifications: any = () => {};
-let unsubscribeFinalizedHeights: any = () => {};
 async function checkSubscription(
   account: Account,
   provider: WsProvider,
@@ -87,12 +85,8 @@ async function checkSubscription(
       syncBlocks(appchain);
       handleCommitments(appchain);
       tryCompleteActions(account, appchain);
-      unsubscribeFinalizedHeights = await subscribeFinalizedHeights(appchain);
-      unsubscribeJustifications = await subscribeJustifications(appchain);
-    } else {
-      console.log("unsubscribe");
-      unsubscribeJustifications();
-      unsubscribeFinalizedHeights();
+      subscribeFinalizedHeights(appchain);
+      subscribeJustifications(appchain);
     }
   }
 }
@@ -152,9 +146,9 @@ async function syncBlock(appchain: ApiPromise, nextHeight: number) {
   const latestFinalizedHeight = getLatestFinalizedHeight();
   if (nextHeight <= latestFinalizedHeight) {
     const nextBlockHash = await appchain.rpc.chain.getBlockHash(nextHeight);
-    debugMode && console.log("nextBlockHash", nextBlockHash);
+    debugMode && console.log("nextBlockHash", nextBlockHash.toJSON());
     const header = await appchain.rpc.chain.getHeader(nextBlockHash);
-    debugMode && console.log("header", header);
+    debugMode && console.log("header", header.toJSON());
     // logJSON("header", header.toJSON());
     header.digest.logs.forEach(async (log) => {
       if (log.isOther) {
