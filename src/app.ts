@@ -86,7 +86,10 @@ async function checkSubscription(
       handleCommitments(appchain);
       tryCompleteActions(account, appchain);
       subscribeFinalizedHeights(appchain);
-      subscribeJustifications(appchain);
+      const isWitnessMode = await checkAnchorIsWitnessMode();
+      if (!isWitnessMode) {
+        subscribeJustifications(appchain);
+      }
     }
   }
 }
@@ -134,10 +137,12 @@ async function syncBlocks(appchain: ApiPromise) {
       }
       setTimeout(() => syncBlocks(appchain), 1000);
       clearTimeout(timer);
+      debugMode = false;
     } catch (e) {
       console.error("syncBlocks error", e);
       setTimeout(() => syncBlocks(appchain), 10 * 1000);
       clearTimeout(timer);
+      debugMode = false;
     }
   }
 }
@@ -200,12 +205,10 @@ function decodeMmrProofWrapper(rawMmrProofWrapper: any): {
   };
 }
 
-async function subscribeJustifications(appchain: ApiPromise) {
-  return await appchain.rpc.beefy.subscribeJustifications(
-    async (justification) => {
-      await handleJustification(appchain, justification);
-    }
-  );
+function subscribeJustifications(appchain: ApiPromise) {
+  appchain.rpc.beefy.subscribeJustifications(async (justification) => {
+    await handleJustification(appchain, justification);
+  });
 }
 
 let lastStateUpdated = 0;
