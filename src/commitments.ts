@@ -7,7 +7,12 @@ import {
 } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
-import { storeAction, confirmAction, isActionCompleted } from "./actions";
+import {
+  storeAction,
+  confirmAction,
+  isActionCompleted,
+  checkAnchorIsWitnessMode,
+} from "./actions";
 import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
 import { updateStateMinInterval } from "./constants";
 import { MmrLeafProof } from "@polkadot/types/interfaces";
@@ -77,12 +82,13 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
 
   let rawProof: MmrLeafProof | undefined = undefined;
   let messageProof: MessageProof | undefined = undefined;
-  const blocksPerMin = 10;
-  if (
-    commitment.height >
-    blockNumberInAnchor + blocksPerMin * (updateStateMinInterval + 1)
-  ) {
-    console.log("update_state not in time, use empty proofs");
+
+  const isWitnessMode = await checkAnchorIsWitnessMode();
+  if (isWitnessMode) {
+    console.log(
+      "witnessMode ===== relay messages without proofs",
+      encoded_messages
+    );
     messageProof = messageProofWithoutProof(encoded_messages);
   } else if (commitment.height < blockNumberInAnchor) {
     console.log("relay messages with proofs");
@@ -182,10 +188,6 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
 }
 
 function messageProofWithoutProof(encoded_messages: string): MessageProof {
-  console.log(
-    "witnessMode ===== relay messages without proofs",
-    encoded_messages
-  );
   return {
     header: [] as number[],
     encoded_messages: toNumArray(encoded_messages),

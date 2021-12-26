@@ -2,7 +2,6 @@ import { Account } from "near-api-js";
 import { ApiPromise } from "@polkadot/api";
 import { tryComplete, getAnchorSettings } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
-import types from "./types";
 import { dbRunAsync, dbAllAsync, upsertActions, dbGetAsync } from "./db";
 import { Action, ActionType } from "./interfaces";
 import { Type } from "@polkadot/types";

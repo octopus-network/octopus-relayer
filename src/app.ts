@@ -6,7 +6,6 @@ const keccak256 = require("keccak256");
 const publicKeyToAddress = require("ethereum-public-key-to-address");
 const { MerkleTree } = require("merkletreejs");
 import { initNearRpc, updateState } from "./nearCalls";
-import types from "./types";
 import { initDb } from "./db";
 import { MerkleProof } from "./interfaces";
 import {
@@ -39,7 +38,6 @@ async function start() {
   const wsProvider = new WsProvider(appchainEndpoint, 5 * 60 * 1000);
   const appchain = await ApiPromise.create({
     provider: wsProvider,
-    types,
   });
 
   wsProvider.on("connected", () =>
@@ -61,11 +59,13 @@ async function start() {
     console.log("api", "error", JSON.stringify(error))
   );
   checkSubscription(account, wsProvider, appchain);
+  setInterval(() => witnessModeWatcher(appchain), 10 * 1000);
   return { appchain, account };
 }
 
 let lastProviderConnectionLog = false;
 let lastAppchainConnectionLog = false;
+let lastIsWitnessMode = true;
 async function checkSubscription(
   account: Account,
   provider: WsProvider,
@@ -86,12 +86,17 @@ async function checkSubscription(
       handleCommitments(appchain);
       tryCompleteActions(account, appchain);
       subscribeFinalizedHeights(appchain);
-      const isWitnessMode = await checkAnchorIsWitnessMode();
-      if (!isWitnessMode) {
-        subscribeJustifications(appchain);
-      }
+      lastIsWitnessMode = true;
     }
   }
+}
+
+async function witnessModeWatcher(appchain: ApiPromise) {
+  const isWitnessMode = await checkAnchorIsWitnessMode();
+  if (lastIsWitnessMode && !isWitnessMode) {
+    subscribeJustifications(appchain);
+  }
+  lastIsWitnessMode = isWitnessMode;
 }
 
 let lastSyncBlocksLog = 0;
@@ -206,6 +211,7 @@ function decodeMmrProofWrapper(rawMmrProofWrapper: any): {
 }
 
 function subscribeJustifications(appchain: ApiPromise) {
+  console.log("subscribeJustifications");
   appchain.rpc.beefy.subscribeJustifications(async (justification) => {
     await handleJustification(appchain, justification);
   });
