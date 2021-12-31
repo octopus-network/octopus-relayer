@@ -59,13 +59,11 @@ async function start() {
     console.log("api", "error", JSON.stringify(error))
   );
   checkSubscription(account, wsProvider, appchain);
-  setInterval(() => witnessModeWatcher(appchain), 10 * 1000);
   return { appchain, account };
 }
 
 let lastProviderConnectionLog = false;
 let lastAppchainConnectionLog = false;
-let lastIsWitnessMode = true;
 async function checkSubscription(
   account: Account,
   provider: WsProvider,
@@ -86,17 +84,9 @@ async function checkSubscription(
       handleCommitments(appchain);
       tryCompleteActions(account, appchain);
       subscribeFinalizedHeights(appchain);
-      lastIsWitnessMode = true;
+      subscribeJustifications(appchain);
     }
   }
-}
-
-async function witnessModeWatcher(appchain: ApiPromise) {
-  const isWitnessMode = await checkAnchorIsWitnessMode();
-  if (lastIsWitnessMode && !isWitnessMode) {
-    subscribeJustifications(appchain);
-  }
-  lastIsWitnessMode = isWitnessMode;
 }
 
 let lastSyncBlocksLog = 0;

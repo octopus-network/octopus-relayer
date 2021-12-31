@@ -176,6 +176,14 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
 
     if (failedCall) {
       await markAsSent(commitment.commitment, 2, txId);
+      const latestIsWitnessMode = await checkAnchorIsWitnessMode();
+      if (isWitnessMode && !latestIsWitnessMode) {
+        console.log(
+          "re-handle commitment for witnessMode switching",
+          commitment
+        );
+        await handleCommitment(commitment, appchain);
+      }
     } else {
       await markAsSent(commitment.commitment, 1, txId);
       await Promise.all(
