@@ -34,32 +34,38 @@ const BLOCK_LOG_SIZE = 100;
 async function start() {
   initDb();
   const account = await initNearRpc();
+  await resetPolkadotApi(account);
+}
 
+async function resetPolkadotApi(_account: Account, _appchain?: ApiPromise) {
+  console.log("resetPolkadotApi");
+  if (_appchain) {
+    await _appchain.disconnect();
+  }
   const wsProvider = new WsProvider(appchainEndpoint, 5 * 60 * 1000);
   const appchain = await ApiPromise.create({
     provider: wsProvider,
   });
 
   wsProvider.on("connected", () =>
-    checkSubscription(account, wsProvider, appchain)
+    checkSubscription(_account, wsProvider, appchain)
   );
-  wsProvider.on("disconnected", () =>
-    checkSubscription(account, wsProvider, appchain)
-  );
+  wsProvider.on("disconnected", async () => {
+    checkSubscription(_account, wsProvider, appchain);
+  });
   wsProvider.on("error", (error) =>
     console.log("provider", "error", JSON.stringify(error))
   );
   appchain.on("connected", () =>
-    checkSubscription(account, wsProvider, appchain)
+    checkSubscription(_account, wsProvider, appchain)
   );
   appchain.on("disconnected", () =>
-    checkSubscription(account, wsProvider, appchain)
+    checkSubscription(_account, wsProvider, appchain)
   );
   appchain.on("error", (error) =>
     console.log("api", "error", JSON.stringify(error))
   );
-  checkSubscription(account, wsProvider, appchain);
-  return { appchain, account };
+  checkSubscription(_account, wsProvider, appchain);
 }
 
 let lastProviderConnectionLog = false;
@@ -85,6 +91,12 @@ async function checkSubscription(
       tryCompleteActions(account, appchain);
       subscribeFinalizedHeights(appchain);
       subscribeJustifications(appchain);
+    } else {
+      const resetDelay = 10 * 1000;
+      setTimeout(async () => {
+        await appchain.disconnect();
+        resetPolkadotApi(account, appchain);
+      }, resetDelay);
     }
   }
 }
