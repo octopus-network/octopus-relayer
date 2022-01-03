@@ -40,7 +40,7 @@ async function start() {
 async function resetPolkadotApi(_account: Account, _appchain?: ApiPromise) {
   console.log("resetPolkadotApi");
   if (_appchain) {
-    await _appchain.disconnect();
+    _appchain.disconnect();
   }
   const wsProvider = new WsProvider(appchainEndpoint, 5 * 60 * 1000);
   const appchain = await ApiPromise.create({
