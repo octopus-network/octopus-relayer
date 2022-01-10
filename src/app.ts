@@ -32,7 +32,7 @@ const BLOCK_SYNC_SIZE = 20;
 const BLOCK_LOG_SIZE = 100;
 
 async function start() {
-  initDb();
+  await initDb();
   const account = await initNearRpc();
   const wsProvider = new WsProvider(appchainEndpoint);
   const appchain = await ApiPromise.create({
