@@ -1,6 +1,6 @@
 import { Hash, Digest } from "@polkadot/types/interfaces";
 
-export type ActionType = "UpdateState" | "PlanNewEra" | "EraPayout";
+export type ActionType = "UpdateState" | "PlanNewEra" | "EraPayout" | "Lock" | "BurnAsset";
 
 export interface Commitment {
   height: number;

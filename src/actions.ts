@@ -120,6 +120,9 @@ export async function confirmAction(
   try {
     const healthy = await isActionHealthy(payloadTypeString);
     if (healthy) {
+      if (["Lock", "BurnAsset"].includes(payloadTypeString)) {
+        return true;
+      }
       if (payloadTypeString == "PlanNewEra") {
         const switchingEraResult = await tryComplete("try_complete_switching_era");
         if (!switchingEraResult) {
