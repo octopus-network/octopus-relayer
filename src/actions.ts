@@ -5,6 +5,7 @@ import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, upsertActions, dbGetAsync } from "./db";
 import { Action, ActionType } from "./interfaces";
 import { Type } from "@polkadot/types";
+import { updateStateMinInterval } from "./constants";
 
 export async function storeAction(type: ActionType): Promise<any> {
   await upsertActions({
@@ -49,34 +50,45 @@ export async function tryCompleteActions(
   if (appchain.isConnected) {
     const actions: Action[] = await getNotCompletedActions();
     for (let index = 0; index < actions.length; index++) {
+      const { type } = actions[index];
       try {
-        const { type } = actions[index];
-        if (type === "PlanNewEra") {
-          const switchingEraResult = await tryComplete(
-            "try_complete_switching_era"
-          );
-          if (switchingEraResult) {
-            await actionCompleted(type);
+        const healthy = await isActionHealthy(type);
+        if (healthy) {
+          if (type === "PlanNewEra") {
+            const switchingEraResult = await tryComplete(
+              "try_complete_switching_era"
+            );
+            if (switchingEraResult) {
+              await actionCompleted(type);
+            }
           }
-        }
-        if (type === "EraPayout") {
-          const distributingRewardtResult = await tryComplete(
-            "try_complete_distributing_reward"
-          );
-          if (distributingRewardtResult) {
-            await actionCompleted(type);
+          if (type === "EraPayout") {
+            const distributingRewardtResult = await tryComplete(
+              "try_complete_distributing_reward"
+            );
+            if (distributingRewardtResult) {
+              await actionCompleted(type);
+            }
           }
-        }
-        if (type === "UpdateState") {
-          const updatetStateResult = await tryComplete(
-            "try_complete_updating_state_of_beefy_light_client"
-          );
-          if (updatetStateResult) {
-            await actionCompleted(type);
+          if (type === "UpdateState") {
+            const updatetStateResult = await tryComplete(
+              "try_complete_updating_state_of_beefy_light_client"
+            );
+            if (updatetStateResult) {
+              await actionCompleted(type);
+            }
           }
+          await unmarkFailedAction(type);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("tryCompleteActions failed", e);
+        if (e.transaction_outcome) {
+          await markFailedAction(type);
+          console.error(
+            "tryCompleteActions failed-txId",
+            e.transaction_outcome.id
+          );
+        }
       }
     }
     setTimeout(() => {
@@ -85,36 +97,67 @@ export async function tryCompleteActions(
   }
 }
 
+async function markFailedAction(payloadTypeString: ActionType) {
+  await upsertActions({
+    type: payloadTypeString,
+    status: 0,
+    failed_at: Date.now()
+  });
+  console.error("tryCompleteActions stopped", payloadTypeString);
+}
+
+async function unmarkFailedAction(payloadTypeString: ActionType) {
+  await dbRunAsync(`UPDATE actions SET failed_at = NULL WHERE type == ?`, [
+    payloadTypeString,
+  ]);
+  console.log("tryCompleteActions continue", payloadTypeString);
+}
+
 export async function confirmAction(
   payloadTypeString: ActionType
 ): Promise<boolean | undefined> {
   console.log("confirmAction", payloadTypeString);
-  if (payloadTypeString == "PlanNewEra") {
-    const switchingEraResult = await tryComplete("try_complete_switching_era");
-    if (!switchingEraResult) {
-      return await confirmAction(payloadTypeString);
-    } else {
-      return true;
+  try {
+    const healthy = await isActionHealthy(payloadTypeString);
+    if (healthy) {
+      if (payloadTypeString == "PlanNewEra") {
+        const switchingEraResult = await tryComplete("try_complete_switching_era");
+        if (!switchingEraResult) {
+          return await confirmAction(payloadTypeString);
+        } else {
+          return true;
+        }
+      }
+      if (payloadTypeString == "EraPayout") {
+        const distributingRewardtResult = await tryComplete(
+          "try_complete_distributing_reward"
+        );
+        if (!distributingRewardtResult) {
+          return await confirmAction(payloadTypeString);
+        } else {
+          return true;
+        }
+      }
+      if (payloadTypeString === "UpdateState") {
+        const updatetStateResult = await tryComplete(
+          "try_complete_updating_state_of_beefy_light_client"
+        );
+        if (!updatetStateResult) {
+          return await confirmAction(payloadTypeString);
+        } else {
+          return true;
+        }
+      }
+      await unmarkFailedAction(payloadTypeString);
     }
-  }
-  if (payloadTypeString == "EraPayout") {
-    const distributingRewardtResult = await tryComplete(
-      "try_complete_distributing_reward"
-    );
-    if (!distributingRewardtResult) {
-      return await confirmAction(payloadTypeString);
-    } else {
-      return true;
-    }
-  }
-  if (payloadTypeString === "UpdateState") {
-    const updatetStateResult = await tryComplete(
-      "try_complete_updating_state_of_beefy_light_client"
-    );
-    if (!updatetStateResult) {
-      return await confirmAction(payloadTypeString);
-    } else {
-      return true;
+  } catch (e: any) {
+    console.error("tryCompleteActions failed", e);
+    if (e.transaction_outcome) {
+      await markFailedAction(payloadTypeString);
+      console.error(
+        "tryCompleteActions failed-txId",
+        e.transaction_outcome.id
+      );
     }
   }
 }
@@ -134,4 +177,13 @@ export async function checkAnchorIsWitnessMode() {
 export async function isActionCompleted(type: ActionType) {
   const action = await getAction(type);
   return action ? action.status === 1 : true;
+}
+
+export async function isActionHealthy(type: ActionType) {
+  const action = await getAction(type);
+  if (!action || !action.failed_at || Date.now() - action.failed_at > updateStateMinInterval * 60 * 1000) {
+    return true;
+  } else {
+    return false;
+  }
 }

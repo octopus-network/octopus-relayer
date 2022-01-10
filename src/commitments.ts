@@ -1,10 +1,6 @@
 import { ApiPromise } from "@polkadot/api";
 import { decodeData, logJSON, toNumArray } from "./utils";
-import {
-  relayMessages,
-  getLatestCommitmentBlockNumber,
-  tryComplete,
-} from "./nearCalls";
+import { relayMessages, getLatestCommitmentBlockNumber } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
 import {
@@ -128,11 +124,16 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     let txId: string = "";
     let failedCall: any = null;
     try {
+      let allConfirmed = true;
       for (let index = 0; index < decoded_messages.length; index++) {
         const payloadTypeString =
           decoded_messages[index].payload_type.toString();
         console.log("payloadTypeString", payloadTypeString);
-        await confirmAction(payloadTypeString);
+        allConfirmed = allConfirmed && !!(await confirmAction(payloadTypeString));
+      }
+
+      if (!allConfirmed) {
+        return;
       }
 
       let inStateCompleting: boolean = false;

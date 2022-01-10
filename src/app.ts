@@ -34,38 +34,29 @@ const BLOCK_LOG_SIZE = 100;
 async function start() {
   initDb();
   const account = await initNearRpc();
-  await resetPolkadotApi(account);
-}
-
-async function resetPolkadotApi(_account: Account, _appchain?: ApiPromise) {
-  console.log("resetPolkadotApi");
-  if (_appchain) {
-    _appchain.disconnect();
-  }
-  const wsProvider = new WsProvider(appchainEndpoint, 5 * 60 * 1000);
+  const wsProvider = new WsProvider(appchainEndpoint);
   const appchain = await ApiPromise.create({
     provider: wsProvider,
   });
-
   wsProvider.on("connected", () =>
-    checkSubscription(_account, wsProvider, appchain)
+    checkSubscription(account, wsProvider, appchain)
   );
   wsProvider.on("disconnected", async () => {
-    checkSubscription(_account, wsProvider, appchain);
+    checkSubscription(account, wsProvider, appchain);
   });
   wsProvider.on("error", (error) =>
     console.log("provider", "error", JSON.stringify(error))
   );
   appchain.on("connected", () =>
-    checkSubscription(_account, wsProvider, appchain)
+    checkSubscription(account, wsProvider, appchain)
   );
   appchain.on("disconnected", () =>
-    checkSubscription(_account, wsProvider, appchain)
+    checkSubscription(account, wsProvider, appchain)
   );
   appchain.on("error", (error) =>
     console.log("api", "error", JSON.stringify(error))
   );
-  checkSubscription(_account, wsProvider, appchain);
+  checkSubscription(account, wsProvider, appchain);
 }
 
 let lastProviderConnectionLog = false;
@@ -93,9 +84,9 @@ async function checkSubscription(
       subscribeJustifications(appchain);
     } else {
       const resetDelay = 10 * 1000;
+      console.log("for restart");
       setTimeout(async () => {
-        await appchain.disconnect();
-        resetPolkadotApi(account, appchain);
+        process.exit(-1);
       }, resetDelay);
     }
   }
@@ -290,12 +281,13 @@ async function handleJustification(
 
   const actionType = "UpdateState";
   try {
-    await confirmAction(actionType);
-    setRelayMessagesLock(true);
-    await updateState(lightClientState);
-    setRelayMessagesLock(false);
-    await storeAction(actionType);
-    lastStateUpdated = Date.now();
+    if (await confirmAction(actionType)) {
+      setRelayMessagesLock(true);
+      await updateState(lightClientState);
+      setRelayMessagesLock(false);
+      await storeAction(actionType);
+      lastStateUpdated = Date.now();
+    }
   } catch (err) {
     setRelayMessagesLock(false);
     console.log(err);

@@ -5,6 +5,8 @@
   "main": "app.js",
   "scripts": {
     "dev": "ts-node-dev ./src/app.ts",
+    "migrate-up": "node node_modules/db-migrate/bin/db-migrate up -c 1",
+    "migrate-down": "node node_modules/db-migrate/bin/db-migrate down -c 1",
     "build": "tsc -p .",
     "buildRun": "tsc & node ./dist/app.js",
     "start": "node ./dist/app.js"
@@ -17,6 +19,8 @@
     "@polkadot/keyring": "^7.8.2",
     "@polkadot/types": "^6.9.2",
     "chalk": "^4.1.1",
+    "db-migrate": "^0.11.13",
+    "db-migrate-sqlite3": "^0.4.0",
     "dotenv": "^10.0.0",
     "ethereum-public-key-to-address": "^0.0.5",
     "keccak256": "^1.0.3",

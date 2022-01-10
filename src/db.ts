@@ -13,8 +13,10 @@ export function initDb() {
     "CREATE TABLE IF NOT EXISTS commitments(height INTEGER, commitment TEXT, created_at TEXT, updated_at TEXT, tx_id TEXT, status INTEGER)"
   );
   // status
-  // 0: inProgress, 1: successful
-  db.run("CREATE TABLE IF NOT EXISTS actions(type TEXT, status INTEGER)");
+  // 0: inProgress, 1: successful, 2: failed
+  db.run(
+    "CREATE TABLE IF NOT EXISTS actions(type TEXT, status INTEGER, failed_at INTEGER)"
+  );
   // type == 1 means for commitments
   db.run(
     "CREATE TABLE IF NOT EXISTS last_synced_blocks(height INTEGER, type INTEGER)"

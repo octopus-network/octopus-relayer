@@ -10,8 +10,9 @@ export interface Commitment {
 }
 
 export interface Action {
-  type: string;
+  type: ActionType;
   status: number;
+  failed_at: number;
 }
 
 export interface Proof {
