@@ -2,6 +2,14 @@
 # https://hub.docker.com/_/node
 FROM node:16-slim
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    libsqlite3-dev \
+    build-essential \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 # Create and change to the app directory.
 WORKDIR /usr/src/app
 
@@ -13,7 +21,7 @@ COPY package*.json ./
 # Install production dependencies.
 # If you add a package-lock.json, speed your build by switching to 'npm ci'.
 # RUN npm ci --only=production
-RUN npm install --only=production
+RUN npm install --only=production --python=/usr/bin/python3
 
 # Copy local code to the container image.
 COPY . ./
