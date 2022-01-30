@@ -98,18 +98,14 @@ async function syncBlocks(appchain: ApiPromise) {
   // set expired time for the whole async block
   const timer = setTimeout(() => {
     console.error("syncBlocks expired");
-    debugMode = true;
     syncBlocks(appchain);
+    process.exit(-1);
   }, 2 * 60 * 1000);
-
-  debugMode && console.log("appchain.isConnected:", appchain.isConnected);
 
   if (appchain.isConnected) {
     try {
       const nextHeight = await getNextHeight();
-      debugMode && console.log("nextHeight:", nextHeight);
       const latestFinalizedHeight = getLatestFinalizedHeight();
-      debugMode && console.log("latestFinalizedHeight:", latestFinalizedHeight);
       if (nextHeight <= latestFinalizedHeight) {
         if (nextHeight - lastSyncBlocksLog >= BLOCK_LOG_SIZE) {
           console.log("nextHeight", nextHeight);
@@ -121,16 +117,11 @@ async function syncBlocks(appchain: ApiPromise) {
             .map(async (_, index) => {
               await syncBlock(appchain, nextHeight + index);
             });
-          debugMode && console.log("set promises");
           await Promise.all(promises);
-          debugMode && console.log("promises executed");
           await updateSyncedBlock(nextHeight + BLOCK_SYNC_SIZE - 1);
-          debugMode && console.log("syncedBlock updated");
         } else {
           await syncBlock(appchain, nextHeight);
-          debugMode && console.log("syncBlock");
           await updateSyncedBlock(nextHeight);
-          debugMode && console.log("syncedBlock updated");
         }
       }
       setTimeout(() => syncBlocks(appchain), 1000);
@@ -149,15 +140,12 @@ async function syncBlock(appchain: ApiPromise, nextHeight: number) {
   const latestFinalizedHeight = getLatestFinalizedHeight();
   if (nextHeight <= latestFinalizedHeight) {
     const nextBlockHash = await appchain.rpc.chain.getBlockHash(nextHeight);
-    debugMode && console.log("nextBlockHash", nextBlockHash.toJSON());
     const header = await appchain.rpc.chain.getHeader(nextBlockHash);
-    debugMode && console.log("header", header.toJSON());
     // logJSON("header", header.toJSON());
     header.digest.logs.forEach(async (log) => {
       if (log.isOther) {
         const commitment = log.asOther.toString();
         await storeCommitment(header.number.toNumber(), commitment);
-        debugMode && console.log("commitment stored", commitment);
       }
     });
   }
