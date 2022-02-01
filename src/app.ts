@@ -38,18 +38,22 @@ async function start() {
   const appchain = await ApiPromise.create({
     provider: wsProvider,
   });
+  const timer = setTimeout(() => {
+    console.error("Init appchain api expired");
+    process.exit(-1);
+  }, 2 * 60 * 1000);
   wsProvider.on("connected", () =>
-    checkSubscription(account, wsProvider, appchain)
-  );
+    checkSubscription(account, wsProvider, appchain));
   wsProvider.on("disconnected", async () => {
     checkSubscription(account, wsProvider, appchain);
   });
   wsProvider.on("error", (error) =>
     console.log("provider", "error", JSON.stringify(error))
   );
-  appchain.on("connected", () =>
-    checkSubscription(account, wsProvider, appchain)
-  );
+  appchain.on("connected", () => {
+    clearTimeout(timer);
+    checkSubscription(account, wsProvider, appchain);
+  });
   appchain.on("disconnected", () =>
     checkSubscription(account, wsProvider, appchain)
   );
