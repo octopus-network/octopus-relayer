@@ -23,6 +23,13 @@ export async function initDb() {
   await dbRunAsync(
     "CREATE TABLE IF NOT EXISTS last_synced_blocks(height INTEGER, type INTEGER)"
   );
+
+  // status
+  // 0: exists
+  // 1: handled
+  await dbRunAsync(
+    "CREATE TABLE IF NOT EXISTS last_message_processing_problems(type INTEGER, tx_id TEXT, failed_at INTEGER, status INTEGER)"
+  );
   await migrate();
 }
 
@@ -41,6 +48,14 @@ export async function migrate() {
 export const upsertLastSyncedBlocks = promisify(
   upsert({
     table: "last_synced_blocks",
+    key: "type",
+    db: db,
+  })
+);
+
+export const upsertMessageProcessingProblems = promisify(
+  upsert({
+    table: "last_message_processing_problems",
     key: "type",
     db: db,
   })
