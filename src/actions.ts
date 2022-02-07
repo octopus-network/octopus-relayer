@@ -57,22 +57,6 @@ export async function tryCompleteActions(
       try {
         const healthy = await isActionHealthy(type);
         if (healthy) {
-          if (type === "PlanNewEra") {
-            const switchingEraResult = await tryComplete(
-              "try_complete_switching_era"
-            );
-            if (switchingEraResult) {
-              await actionCompleted(type);
-            }
-          }
-          if (type === "EraPayout") {
-            const distributingRewardtResult = await tryComplete(
-              "try_complete_distributing_reward"
-            );
-            if (distributingRewardtResult) {
-              await actionCompleted(type);
-            }
-          }
           if (type === "UpdateState") {
             const isWitnessMode = await checkAnchorIsWitnessMode();
             if (!isWitnessMode) {
@@ -120,40 +104,20 @@ async function unmarkFailedAction(payloadTypeString: ActionType) {
 
 export async function confirmAction(
   payloadTypeString: ActionType
-): Promise<boolean | undefined> {
+): Promise<boolean> {
   console.log("confirmAction", payloadTypeString);
+  let returnVal = false;
   try {
     const healthy = await isActionHealthy(payloadTypeString);
     if (healthy) {
-      if (["Lock", "BurnAsset"].includes(payloadTypeString)) {
-        return true;
-      }
-      if (payloadTypeString == "PlanNewEra") {
-        const switchingEraResult = await tryComplete("try_complete_switching_era");
-        if (!switchingEraResult) {
-          return await confirmAction(payloadTypeString);
-        } else {
-          return true;
-        }
-      }
-      if (payloadTypeString == "EraPayout") {
-        const distributingRewardtResult = await tryComplete(
-          "try_complete_distributing_reward"
-        );
-        if (!distributingRewardtResult) {
-          return await confirmAction(payloadTypeString);
-        } else {
-          return true;
-        }
-      }
       if (payloadTypeString === "UpdateState") {
         const updatetStateResult = await tryComplete(
           "try_complete_updating_state_of_beefy_light_client"
         );
         if (!updatetStateResult) {
-          return await confirmAction(payloadTypeString);
+          returnVal = await confirmAction(payloadTypeString);
         } else {
-          return true;
+          returnVal = true;
         }
       }
       await unmarkFailedAction(payloadTypeString);
@@ -168,18 +132,7 @@ export async function confirmAction(
       );
     }
   }
-}
-
-export async function checkAnchorIsWitnessMode() {
-  try {
-    const anchorSettings = await getAnchorSettings();
-    return anchorSettings
-      ? anchorSettings.beefy_light_client_witness_mode
-      : false;
-  } catch (error) {
-    console.error("checkAnchorIsWitnessMode error", error);
-    return false;
-  }
+  return returnVal;
 }
 
 export async function isActionCompleted(type: ActionType) {

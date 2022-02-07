@@ -42,7 +42,7 @@ export async function relayMessages(args: MessageProof) {
   console.log("------------------------------------");
   return await account.functionCall({
     contractId: anchorContractId as string,
-    methodName: "verify_and_apply_appchain_messages",
+    methodName: "verify_and_stage_appchain_messages",
     args,
     gas: DEFAULT_GAS,
     attachedDeposit: new BN("0"),
@@ -69,6 +69,38 @@ export async function getLatestCommitmentBlockNumber() {
     {}
   );
   return latest_commitment ? latest_commitment.block_number : 0;
+}
+
+export async function processAppchainMessages() {
+  const result: any = await account.functionCall({
+    contractId: anchorContractId as string,
+    methodName: "process_appchain_messages",
+    args: {},
+    gas: DEFAULT_GAS,
+    attachedDeposit: new BN("0"),
+  });
+  let returnVal: any = null;
+  const returnValBase64 = result.status.SuccessValue;
+  if (returnValBase64) {
+    returnVal = JSON.parse(
+      Buffer.from(returnValBase64, "base64").toString("utf8")
+    );
+  }
+  console.log("returnVal: ", returnVal.Error);
+  // const isOk = returnVal === "Ok";
+  return { result, returnVal };
+}
+
+export async function checkAnchorIsWitnessMode() {
+  try {
+    const anchorSettings = await getAnchorSettings();
+    return anchorSettings
+      ? anchorSettings.beefy_light_client_witness_mode
+      : false;
+  } catch (error) {
+    console.error("checkAnchorIsWitnessMode error", error);
+    return false;
+  }
 }
 
 export async function tryComplete(methodName: string) {

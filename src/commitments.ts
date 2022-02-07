@@ -1,14 +1,12 @@
 import { ApiPromise } from "@polkadot/api";
 import { decodeData, logJSON, toNumArray } from "./utils";
-import { relayMessages, getLatestCommitmentBlockNumber } from "./nearCalls";
+import { relayMessages, getLatestCommitmentBlockNumber, checkAnchorIsWitnessMode } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
 import {
-  storeAction,
-  confirmAction,
   isActionCompleted,
-  checkAnchorIsWitnessMode,
 } from "./actions";
+import { confirmProcessingMessages } from "./messages";
 import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
 import { updateStateMinInterval } from "./constants";
 import { MmrLeafProof } from "@polkadot/types/interfaces";
@@ -76,6 +74,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     },
     encoded_messages
   );
+  console.log("decoded_messages", decoded_messages.toJSON());
   const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
   const latestFinalizedHeight = getLatestFinalizedHeight();
   if (
@@ -133,18 +132,6 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     let txId: string = "";
     let failedCall: any = null;
     try {
-      let allConfirmed = true;
-      for (let index = 0; index < decoded_messages.length; index++) {
-        const payloadTypeString =
-          decoded_messages[index].payload_type.toString();
-        console.log("payloadTypeString", payloadTypeString);
-        allConfirmed = allConfirmed && !!(await confirmAction(payloadTypeString));
-      }
-
-      if (!allConfirmed) {
-        return;
-      }
-
       let inStateCompleting: boolean = false;
       if (rawProof) {
         inStateCompleting = !(await isActionCompleted("UpdateState"));
@@ -169,21 +156,6 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
       }
     }
 
-    let needCompletes: any = {
-      PlanNewEra: false,
-      EraPayout: false,
-    };
-
-    if (!failedCall) {
-      decoded_messages.forEach((msg: any) => {
-        if (msg.payload_type.toString() === "PlanNewEra") {
-          needCompletes.PlanNewEra = true;
-        } else if (msg.payload_type.toString() === "EraPayout") {
-          needCompletes.EraPayout = true;
-        }
-      });
-    }
-
     if (failedCall) {
       await markAsSent(commitment.commitment, 2, txId);
       const latestIsWitnessMode = await checkAnchorIsWitnessMode();
@@ -196,12 +168,9 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
       }
     } else {
       await markAsSent(commitment.commitment, 1, txId);
-      await Promise.all(
-        Object.keys(needCompletes).map(async (key) =>
-          needCompletes[key] ? await storeAction(key as ActionType) : null
-        )
-      );
+      await confirmProcessingMessages();
     }
+
   }
 }
 

@@ -5,7 +5,7 @@ import { decodeData, logJSON, toNumArray } from "./utils";
 const keccak256 = require("keccak256");
 const publicKeyToAddress = require("ethereum-public-key-to-address");
 const { MerkleTree } = require("merkletreejs");
-import { initNearRpc, updateState } from "./nearCalls";
+import { initNearRpc, updateState, checkAnchorIsWitnessMode } from "./nearCalls";
 import { initDb } from "./db";
 import { MerkleProof } from "./interfaces";
 import {
@@ -22,9 +22,11 @@ import {
 import {
   storeAction,
   confirmAction,
-  checkAnchorIsWitnessMode,
+  tryCompleteActions
 } from "./actions";
-import { tryCompleteActions } from "./actions";
+import {
+  confirmProcessingMessages
+} from "./messages";
 import { LightClientState, ActionType } from "./interfaces";
 const { isEqual } = require("lodash");
 import { appchainEndpoint, updateStateMinInterval } from "./constants";
@@ -88,6 +90,7 @@ async function handleConnected(
   console.log("provider.isConnected", provider.isConnected);
   console.log("appchain.isConnected", appchain.isConnected);
   tryCompleteActions(account, appchain);
+  confirmProcessingMessages();
 }
 
 let lastSyncBlocksLog = 0;
