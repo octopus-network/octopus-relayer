@@ -89,21 +89,20 @@ async function checkSubscription(
     } else {
       const resetDelay = 10 * 1000;
       console.log("for restart");
-      setTimeout(async () => {
-        process.exit(-1);
-      }, resetDelay);
+      // setTimeout(async () => {
+      //   process.exit(-1);
+      // }, resetDelay);
     }
   }
 }
 
 let lastSyncBlocksLog = 0;
-let debugMode = false;
 async function syncBlocks(appchain: ApiPromise) {
   // set expired time for the whole async block
   const timer = setTimeout(() => {
     console.error("syncBlocks expired");
     syncBlocks(appchain);
-    process.exit(-1);
+    // process.exit(-1);
   }, 2 * 60 * 1000);
 
   if (appchain.isConnected) {
@@ -130,12 +129,10 @@ async function syncBlocks(appchain: ApiPromise) {
       }
       setTimeout(() => syncBlocks(appchain), 1000);
       clearTimeout(timer);
-      debugMode = false;
     } catch (e) {
       console.error("syncBlocks error", e);
       setTimeout(() => syncBlocks(appchain), 10 * 1000);
       clearTimeout(timer);
-      debugMode = false;
     }
   }
 }
