@@ -34,10 +34,6 @@ const BLOCK_LOG_SIZE = 100;
 async function start() {
   await initDb();
   const account = await initNearRpc();
-  const timer = setTimeout(() => {
-    console.error("Init appchain api expired");
-    process.exit(-1);
-  }, 2 * 60 * 1000);
   const wsProvider = new WsProvider(appchainEndpoint);
   const appchain = await ApiPromise.create({
     provider: wsProvider,
@@ -51,7 +47,6 @@ async function start() {
     console.log("provider", "error", JSON.stringify(error))
   );
   appchain.on("connected", () => {
-    clearTimeout(timer);
     checkSubscription(account, wsProvider, appchain);
   });
   appchain.on("disconnected", () =>
