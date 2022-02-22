@@ -95,9 +95,10 @@ let lastSyncBlocksLog = 0;
 async function syncBlocks(appchain: ApiPromise) {
   // set expired time for the whole async block
   const timer = setTimeout(() => {
-    console.error("syncBlocks expired");
-    syncBlocks(appchain);
-    // process.exit(-1);
+    if (!appchain.isConnected) {
+      console.error("syncBlocks expired");
+      process.exit(-1);
+    }
   }, 2 * 60 * 1000);
 
   if (appchain.isConnected) {
