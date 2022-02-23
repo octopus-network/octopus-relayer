@@ -82,11 +82,12 @@ async function checkSubscription(
       subscribeFinalizedHeights(appchain);
       subscribeJustifications(appchain);
     } else {
-      const resetDelay = 10 * 1000;
-      console.log("for restart");
-      // setTimeout(async () => {
-      //   process.exit(-1);
-      // }, resetDelay);
+      setTimeout(async () => {
+        if (!(appchain.isConnected && provider.isConnected)) {
+          console.log("timeout for reconnection");
+          process.exit(-1);
+        }
+      }, 3 * 60 * 1000);
     }
   }
 }
