@@ -38,66 +38,57 @@ async function start() {
   const appchain = await ApiPromise.create({
     provider: wsProvider,
   });
-  wsProvider.on("connected", () =>
-    checkSubscription(account, wsProvider, appchain));
-  wsProvider.on("disconnected", async () => {
-    checkSubscription(account, wsProvider, appchain);
-  });
+  await listening(account, appchain);
+  wsProvider.on("disconnected", async () =>
+    handleDisconnected(wsProvider, appchain)
+  );
   wsProvider.on("error", (error) =>
     console.log("provider", "error", JSON.stringify(error))
   );
-  appchain.on("connected", () => {
-    checkSubscription(account, wsProvider, appchain);
-  });
   appchain.on("disconnected", () =>
-    checkSubscription(account, wsProvider, appchain)
+    handleDisconnected(wsProvider, appchain)
   );
   appchain.on("error", (error) =>
     console.log("api", "error", JSON.stringify(error))
   );
-  checkSubscription(account, wsProvider, appchain);
 }
 
-let lastProviderConnectionLog = false;
-let lastAppchainConnectionLog = false;
-async function checkSubscription(
+async function listening(
   account: Account,
+  appchain: ApiPromise
+) {
+  console.log("start subscribe");
+  syncBlocks(appchain);
+  handleCommitments(appchain);
+  tryCompleteActions(account, appchain);
+  subscribeFinalizedHeights(appchain);
+  subscribeJustifications(appchain);
+}
+
+async function handleDisconnected(
   provider: WsProvider,
   appchain: ApiPromise
 ) {
-  if (
-    provider.isConnected != lastProviderConnectionLog ||
-    appchain.isConnected != lastAppchainConnectionLog
-  ) {
-    console.log("checkSubscription");
-    console.log("provider connection: ", provider.isConnected);
-    console.log("appchain connection: ", appchain.isConnected);
-    lastProviderConnectionLog = provider.isConnected;
-    lastAppchainConnectionLog = appchain.isConnected;
-    if (appchain.isConnected && provider.isConnected) {
-      console.log("start subscribe");
-      syncBlocks(appchain);
-      handleCommitments(appchain);
-      tryCompleteActions(account, appchain);
-      subscribeFinalizedHeights(appchain);
-      subscribeJustifications(appchain);
-    } else {
-      setTimeout(async () => {
-        if (!(appchain.isConnected && provider.isConnected)) {
-          console.log("timeout for reconnection");
-          process.exit(-1);
-        }
-      }, 3 * 60 * 1000);
+  console.log("provider.isConnected", provider.isConnected);
+  console.log("appchain.isConnected", appchain.isConnected);
+  setTimeout(async () => {
+    if (!(appchain.isConnected && provider.isConnected)) {
+      console.log("timeout for reconnection");
+      process.exit(-1);
     }
-  }
+  }, 20 * 60 * 1000);
 }
+
+
 
 let lastSyncBlocksLog = 0;
 async function syncBlocks(appchain: ApiPromise) {
   // set expired time for the whole async block
   const timer = setTimeout(() => {
+    console.error("syncBlocks expired");
+    const latestFinalizedHeight = getLatestFinalizedHeight();
+    console.log("latestFinalizedHeight", latestFinalizedHeight);
     if (!appchain.isConnected) {
-      console.error("syncBlocks expired");
       process.exit(-1);
     }
   }, 2 * 60 * 1000);
@@ -124,14 +115,13 @@ async function syncBlocks(appchain: ApiPromise) {
           await updateSyncedBlock(nextHeight);
         }
       }
-      setTimeout(() => syncBlocks(appchain), 1000);
       clearTimeout(timer);
     } catch (e) {
       console.error("syncBlocks error", e);
-      setTimeout(() => syncBlocks(appchain), 10 * 1000);
       clearTimeout(timer);
     }
   }
+  setTimeout(() => syncBlocks(appchain), 1000);
 }
 
 async function syncBlock(appchain: ApiPromise, nextHeight: number) {
