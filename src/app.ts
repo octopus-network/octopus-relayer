@@ -38,15 +38,15 @@ async function start() {
   const appchain = await ApiPromise.create({
     provider: wsProvider,
   });
-  await listening(account, appchain);
-  wsProvider.on("disconnected", async () =>
-    handleDisconnected(wsProvider, appchain)
-  );
+  await listening(appchain);
   wsProvider.on("error", (error) =>
     console.log("provider", "error", JSON.stringify(error))
   );
   appchain.on("disconnected", () =>
     handleDisconnected(wsProvider, appchain)
+  );
+  appchain.on("connected", () =>
+    handleConnected(account, wsProvider, appchain)
   );
   appchain.on("error", (error) =>
     console.log("api", "error", JSON.stringify(error))
@@ -54,13 +54,11 @@ async function start() {
 }
 
 async function listening(
-  account: Account,
   appchain: ApiPromise
 ) {
   console.log("start subscribe");
   syncBlocks(appchain);
   handleCommitments(appchain);
-  tryCompleteActions(account, appchain);
   subscribeFinalizedHeights(appchain);
   subscribeJustifications(appchain);
 }
@@ -79,7 +77,15 @@ async function handleDisconnected(
   }, 20 * 60 * 1000);
 }
 
-
+async function handleConnected(
+  account: Account,
+  provider: WsProvider,
+  appchain: ApiPromise
+) {
+  console.log("provider.isConnected", provider.isConnected);
+  console.log("appchain.isConnected", appchain.isConnected);
+  tryCompleteActions(account, appchain);
+}
 
 let lastSyncBlocksLog = 0;
 async function syncBlocks(appchain: ApiPromise) {
