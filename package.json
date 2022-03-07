@@ -24,6 +24,7 @@
     "dotenv": "^10.0.0",
     "ethereum-public-key-to-address": "^0.0.5",
     "keccak256": "^1.0.3",
+    "lodash": "^4.17.21",
     "merkletreejs": "^0.2.24",
     "near-api-js": "^0.41.0",
     "snake-camel": "^1.0.8",

@@ -26,6 +26,7 @@ import {
 } from "./actions";
 import { tryCompleteActions } from "./actions";
 import { LightClientState, ActionType } from "./interfaces";
+const { isEqual } = require("lodash");
 import { appchainEndpoint, updateStateMinInterval } from "./constants";
 
 const BLOCK_SYNC_SIZE = 20;
@@ -167,7 +168,6 @@ function decodeMmrProofWrapper(rawMmrProofWrapper: any): {
     },
     mmrProofWrapper.leaf
   );
-  const leafHash = keccak256(mmrProofWrapper.leaf).toString("hex");
   const mmrProof: any = decodeData(
     {
       MMRProof: {
@@ -206,14 +206,34 @@ async function handleJustification(
     console.log("skip this justification. Reason: anchor is witness-mode");
     return;
   }
-  if (inInterval) {
+  const { blockNumber } = justification.commitment;
+  const currBlockHash = await appchain.rpc.chain.getBlockHash(
+    blockNumber
+  );
+  const previousBlockHash = await appchain.rpc.chain.getBlockHash(
+    blockNumber - 1
+  );
+  const currentAuthorities: any = (await appchain.query.beefy.authorities.at(
+    currBlockHash
+  )).toJSON();
+  const previousAuthorities: any = (await appchain.query.beefy.authorities.at(
+    previousBlockHash
+  )).toJSON();
+
+  const isAuthoritiesEqual = isEqual(currentAuthorities, previousAuthorities)
+
+  if (inInterval && isAuthoritiesEqual) {
     console.log("skip this justification. Reason: in interval");
     return;
   }
+
+  if (!isAuthoritiesEqual) {
+    console.log("Authorities changed!");
+  }
+  logJSON("previousAuthorities", previousAuthorities);
+  logJSON("currentAuthorities", currentAuthorities);
+
   console.log("justification encode", JSON.stringify(justification.toHex()));
-  const currBlockHash = await appchain.rpc.chain.getBlockHash(
-    justification.commitment.blockNumber
-  );
   const rawMmrProofWrapper = await appchain.rpc.mmr.generateProof(
     Number(justification.commitment.blockNumber) - 1,
     currBlockHash
@@ -222,18 +242,7 @@ async function handleJustification(
   const decodedMmrProofWrapper = decodeMmrProofWrapper(rawMmrProofWrapper);
   logJSON("decodedMmrProofWrapper", decodedMmrProofWrapper);
 
-  // const validatorProof = {
-  //   root: justification.commitment.payload.toJSON(),
-  //   proof: mmrProof.toJSON(),
-  // };
-
-  const rawAuthorities = (await appchain.query.beefy.authorities.at(
-    currBlockHash
-  )) as DetectCodec<any, any>;
-
-  const authorities = rawAuthorities.toJSON();
-  logJSON("authorities", authorities);
-  const ethAddrs = authorities.map((a: string) => publicKeyToAddress(a));
+  const ethAddrs = currentAuthorities.map((a: string) => publicKeyToAddress(a));
   console.log("ethAddrs", ethAddrs);
   const leaves = ethAddrs.map((a: string) => keccak256(a));
   const tree = new MerkleTree(leaves, keccak256);
@@ -274,15 +283,6 @@ async function handleJustification(
     setRelayMessagesLock(false);
     console.log(err);
   }
-
-  // const simplifiedProof = convertToSimplifiedMMRProof(
-  //   blockHash,
-  //   mmrProof.leafIndex,
-  //   mmrLeaf,
-  //   mmrProof.leafCount,
-  //   mmrProof.items
-  // );
-  // console.log("simplifiedProof", JSON.stringify(simplifiedProof));
 }
 
 start().catch((error) => {
