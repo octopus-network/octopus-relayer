@@ -123,9 +123,11 @@ async function syncBlocks(appchain: ApiPromise) {
         }
       }
       clearTimeout(timer);
-    } catch (e) {
+    } catch (e: any) {
       console.error("syncBlocks error", e);
-      clearTimeout(timer);
+      if (!/disconnected/.test(e.toString())) {
+        clearTimeout(timer);
+      }
     }
   }
   setTimeout(() => syncBlocks(appchain), 1000);

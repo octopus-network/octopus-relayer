@@ -41,9 +41,11 @@ export async function handleCommitments(appchain: ApiPromise) {
         }
       }
       clearTimeout(timer);
-    } catch (e) {
+    } catch (e: any) {
       console.error("commitments handling failed", e);
-      clearTimeout(timer);
+      if (!/disconnected/.test(e.toString())) {
+        clearTimeout(timer);
+      }
     }
   }
   setTimeout(() => handleCommitments(appchain), 1000);
