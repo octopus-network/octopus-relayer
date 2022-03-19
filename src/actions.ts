@@ -71,11 +71,14 @@ export async function tryCompleteActions(
             }
           }
           if (type === "UpdateState") {
-            const updatetStateResult = await tryComplete(
-              "try_complete_updating_state_of_beefy_light_client"
-            );
-            if (updatetStateResult) {
-              await actionCompleted(type);
+            const isWitnessMode = checkAnchorIsWitnessMode();
+            if (!isWitnessMode) {
+              const updatetStateResult = await tryComplete(
+                "try_complete_updating_state_of_beefy_light_client"
+              );
+              if (updatetStateResult) {
+                await actionCompleted(type);
+              }
             }
           }
           await unmarkFailedAction(type);
