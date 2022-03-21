@@ -145,7 +145,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
         console.log("inStateCompleting", inStateCompleting);
       }
 
-      if (relayMessagesLock || inStateCompleting) {
+      if (relayMessagesLock || (inStateCompleting && !isWitnessMode)) {
         return;
       }
 
