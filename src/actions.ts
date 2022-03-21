@@ -110,7 +110,7 @@ async function markFailedAction(payloadTypeString: ActionType) {
 }
 
 async function unmarkFailedAction(payloadTypeString: ActionType) {
-  await dbRunAsync(`UPDATE actions SET failed_at = NULL WHERE type == ?`, [
+  await dbRunAsync(`UPDATE actions SET status = 1, failed_at = NULL WHERE type == ?`, [
     payloadTypeString,
   ]);
   console.log("tryCompleteActions continue", payloadTypeString);
