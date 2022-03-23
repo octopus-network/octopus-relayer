@@ -19,6 +19,7 @@ export async function storeAction(type: ActionType): Promise<any> {
 async function actionCompleted(type: ActionType) {
   console.log("actionCompleted", type);
   await dbRunAsync(`UPDATE actions SET status = ? WHERE type == ?`, [1, type]);
+  await unmarkFailedAction(type);
   const actions = await getActions();
   console.log("actions", actions);
 }
@@ -74,7 +75,6 @@ export async function tryCompleteActions(
           }
           if (type === "UpdateState") {
             const isWitnessMode = await checkAnchorIsWitnessMode();
-            console.log("isWitnessMode", isWitnessMode);
             if (!isWitnessMode) {
               const updatetStateResult = await tryComplete(
                 "try_complete_updating_state_of_beefy_light_client"
@@ -84,7 +84,6 @@ export async function tryCompleteActions(
               }
             }
           }
-          await unmarkFailedAction(type);
         }
       } catch (e: any) {
         console.error("tryCompleteActions failed", e);
