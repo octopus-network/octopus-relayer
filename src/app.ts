@@ -39,7 +39,7 @@ async function start() {
   const appchain = await ApiPromise.create({
     provider: wsProvider,
   });
-  await listening(appchain);
+  listening(appchain, account);
   wsProvider.on("error", (error) =>
     console.log("provider", "error", JSON.stringify(error))
   );
@@ -55,13 +55,15 @@ async function start() {
 }
 
 async function listening(
-  appchain: ApiPromise
+  appchain: ApiPromise,
+  account: Account,
 ) {
   console.log("start subscribe");
   syncBlocks(appchain);
   handleCommitments(appchain);
   subscribeFinalizedHeights(appchain);
   subscribeJustifications(appchain);
+  tryCompleteActions(account, appchain);
 }
 
 async function handleDisconnected(

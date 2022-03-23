@@ -43,10 +43,12 @@ async function getNotCompletedActions(): Promise<Action[]> {
   return actions;
 }
 
+let tryCompleteActionsTimer: any = null;
 export async function tryCompleteActions(
   account: Account,
   appchain: ApiPromise
 ) {
+  clearTimeout(tryCompleteActionsTimer);
   if (appchain.isConnected) {
     const actions: Action[] = await getNotCompletedActions();
     for (let index = 0; index < actions.length; index++) {
@@ -71,7 +73,8 @@ export async function tryCompleteActions(
             }
           }
           if (type === "UpdateState") {
-            const isWitnessMode = checkAnchorIsWitnessMode();
+            const isWitnessMode = await checkAnchorIsWitnessMode();
+            console.log("isWitnessMode", isWitnessMode);
             if (!isWitnessMode) {
               const updatetStateResult = await tryComplete(
                 "try_complete_updating_state_of_beefy_light_client"
@@ -94,7 +97,7 @@ export async function tryCompleteActions(
         }
       }
     }
-    setTimeout(() => {
+    tryCompleteActionsTimer = setTimeout(() => {
       tryCompleteActions(account, appchain);
     }, 200);
   }
