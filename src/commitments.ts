@@ -21,8 +21,16 @@ export function setRelayMessagesLock(status: boolean) {
 
 export async function handleCommitments(appchain: ApiPromise) {
   // set expired time for the whole async block
-  const timer = setTimeout(() => {
+  const timer = setTimeout(async () => {
     console.error("handleCommitments expired");
+    try {
+      // test connection
+      if (await appchain.rpc.chain.getBlockHash(0)) {
+        return;
+      }
+    } catch (e) {
+      console.error("test connection: fail", e);
+    }
     process.exit(-1);
   }, 2 * 60 * 1000);
   if (appchain.isConnected) {

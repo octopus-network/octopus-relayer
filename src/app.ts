@@ -93,10 +93,18 @@ async function handleConnected(
 let lastSyncBlocksLog = 0;
 async function syncBlocks(appchain: ApiPromise) {
   // set expired time for the whole async block
-  const timer = setTimeout(() => {
+  const timer = setTimeout(async () => {
     console.error("syncBlocks expired");
     const latestFinalizedHeight = getLatestFinalizedHeight();
     console.log("latestFinalizedHeight", latestFinalizedHeight);
+    try {
+      // test connection
+      if (await appchain.rpc.chain.getBlockHash(0)) {
+        return;
+      }
+    } catch (e) {
+      console.error("test connection: fail", e);
+    }
     process.exit(-1);
   }, 2 * 60 * 1000);
 
