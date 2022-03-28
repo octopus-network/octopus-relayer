@@ -23,9 +23,7 @@ export async function handleCommitments(appchain: ApiPromise) {
   // set expired time for the whole async block
   const timer = setTimeout(() => {
     console.error("handleCommitments expired");
-    if (!appchain.isConnected) {
-      process.exit(-1);
-    }
+    process.exit(-1);
   }, 2 * 60 * 1000);
   if (appchain.isConnected) {
     try {

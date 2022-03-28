@@ -97,9 +97,7 @@ async function syncBlocks(appchain: ApiPromise) {
     console.error("syncBlocks expired");
     const latestFinalizedHeight = getLatestFinalizedHeight();
     console.log("latestFinalizedHeight", latestFinalizedHeight);
-    if (!appchain.isConnected) {
-      process.exit(-1);
-    }
+    process.exit(-1);
   }, 2 * 60 * 1000);
 
   if (appchain.isConnected) {
