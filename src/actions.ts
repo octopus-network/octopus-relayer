@@ -1,6 +1,6 @@
 import { Account } from "near-api-js";
 import { ApiPromise } from "@polkadot/api";
-import { tryComplete, getAnchorSettings } from "./nearCalls";
+import { tryComplete, getAnchorSettings, checkAnchorIsWitnessMode } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, upsertActions, dbGetAsync } from "./db";
 import { Action, ActionType } from "./interfaces";
