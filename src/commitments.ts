@@ -23,8 +23,12 @@ export async function handleCommitments(appchain: ApiPromise) {
     console.error("handleCommitments expired");
     try {
       // test connection
+      const exitTimer = setTimeout(() => {
+        console.error("test connection: always pending");
+        process.exit(1)
+      }, 10 * 1000);
       if (await appchain.rpc.chain.getBlockHash(0)) {
-        return;
+        return clearTimeout(exitTimer);
       }
     } catch (e) {
       console.error("test connection: fail", e);
@@ -60,23 +64,26 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     appchain,
     commitment.commitment
   );
-  const decoded_messages: any = decodeData(
-    {
-      Messages: "Vec<Message>",
-      Message: {
-        nonce: "u64",
-        payload_type: "PayloadType",
-        payload: "Vec<u8>",
-      },
-      PayloadType: {
-        _enum: ["BurnAsset", "Lock", "PlanNewEra", "EraPayout"],
-      },
-    },
-    encoded_messages
-  );
-  console.log("decoded_messages", decoded_messages.toJSON());
+  // const decoded_messages: any = decodeData(
+  //   {
+  //     Messages: "Vec<Message>",
+  //     Message: {
+  //       nonce: "u64",
+  //       payload_type: "PayloadType",
+  //       payload: "Vec<u8>",
+  //     },
+  //     PayloadType: {
+  //       _enum: ["BurnAsset", "Lock", "PlanNewEra", "EraPayout"],
+  //     },
+  //   },
+  //   encoded_messages
+  // );
+  // console.log("decoded_messages", decoded_messages.toJSON());
   const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
   const latestFinalizedHeight = getLatestFinalizedHeight();
+  console.log("latestFinalizedHeight", latestFinalizedHeight)
+  console.log("commitment.height", commitment.height)
+  console.log("blockNumberInAnchor", blockNumberInAnchor)
   if (
     commitment.height > latestFinalizedHeight ||
     blockNumberInAnchor > latestFinalizedHeight
@@ -125,7 +132,6 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
   }
 
   if (messageProof) {
-    console.log("decoded_messages", JSON.stringify(decoded_messages));
     console.log("blockNumberInAnchor", blockNumberInAnchor);
     console.log("latestFinalizedHeight", latestFinalizedHeight);
     console.log("commitment.height", commitment.height);

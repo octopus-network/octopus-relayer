@@ -102,13 +102,16 @@ async function syncBlocks(appchain: ApiPromise) {
     console.log("latestFinalizedHeight", latestFinalizedHeight);
     try {
       // test connection
+      const exitTimer = setTimeout(() => {
+        console.error("test connection: always pending");
+        process.exit(1)
+      }, 10 * 1000);
       if (await appchain.rpc.chain.getBlockHash(0)) {
-        return;
+        return clearTimeout(exitTimer);
       }
     } catch (e) {
       console.error("test connection: fail", e);
     }
-    process.exit(-1);
   }, 2 * 60 * 1000);
 
   if (appchain.isConnected) {
