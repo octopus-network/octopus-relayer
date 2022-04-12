@@ -100,13 +100,17 @@ async function syncBlocks(appchain: ApiPromise) {
     console.error("syncBlocks expired");
     const latestFinalizedHeight = getLatestFinalizedHeight();
     console.log("latestFinalizedHeight", latestFinalizedHeight);
+
+    // test connection
+    const exitTimer = setTimeout(() => {
+      console.error("test connection: always pending");
+      process.exit(1)
+    }, 10 * 1000);
     try {
-      // test connection
-      const exitTimer = setTimeout(() => {
-        console.error("test connection: always pending");
-        process.exit(1)
-      }, 10 * 1000);
-      if (await appchain.rpc.chain.getBlockHash(0)) {
+      const finalizedHead = await appchain.rpc.chain.getFinalizedHead();
+      if (finalizedHead) {
+        console.log("test connection: Ok");
+        console.log("finalizedHead", finalizedHead)
         return clearTimeout(exitTimer);
       }
     } catch (e) {
