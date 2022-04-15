@@ -31,7 +31,7 @@ import { LightClientState, ActionType } from "./interfaces";
 const { isEqual } = require("lodash");
 import { appchainEndpoint, updateStateMinInterval } from "./constants";
 
-const BLOCK_SYNC_SIZE = 20;
+const BLOCK_SYNC_SIZE = 200;
 const BLOCK_LOG_SIZE = 100;
 
 async function start() {
@@ -148,7 +148,7 @@ async function syncBlocks(appchain: ApiPromise) {
       }
     }
   }
-  setTimeout(() => syncBlocks(appchain), 1000);
+  setTimeout(() => syncBlocks(appchain), 0);
 }
 
 async function syncBlock(appchain: ApiPromise, nextHeight: number) {
