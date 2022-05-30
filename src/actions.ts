@@ -82,7 +82,7 @@ export async function tryCompleteActions(
     }
     tryCompleteActionsTimer = setTimeout(() => {
       tryCompleteActions(account, appchain);
-    }, 200);
+    }, 2000);
   }
 }
 

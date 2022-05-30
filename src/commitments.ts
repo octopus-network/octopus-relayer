@@ -60,7 +60,7 @@ export async function handleCommitments(appchain: ApiPromise) {
       }
     }
   }
-  setTimeout(() => handleCommitments(appchain), 1000);
+  setTimeout(() => handleCommitments(appchain), 6000);
 }
 
 async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {

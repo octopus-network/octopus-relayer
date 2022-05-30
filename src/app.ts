@@ -1,7 +1,7 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import { Account } from "near-api-js";
 import { DetectCodec } from "@polkadot/types/types";
-import { decodeData, logJSON, toNumArray } from "./utils";
+import { decodeData, logJSON, toNumArray, WsProvider2 } from "./utils";
 const keccak256 = require("keccak256");
 const publicKeyToAddress = require("ethereum-public-key-to-address");
 const { MerkleTree } = require("merkletreejs");
@@ -31,13 +31,19 @@ import { LightClientState, ActionType } from "./interfaces";
 const { isEqual } = require("lodash");
 import { appchainEndpoint, updateStateMinInterval } from "./constants";
 
-const BLOCK_SYNC_SIZE = 200;
+const BLOCK_SYNC_SIZE = 20;
 const BLOCK_LOG_SIZE = 100;
 
 async function start() {
   await initDb();
   const account = await initNearRpc();
-  const wsProvider = new WsProvider(appchainEndpoint);
+  const wsProvider = new WsProvider2(appchainEndpoint);
+
+  setInterval(() => {
+    console.log("callCache capacity", wsProvider.getCallCache().capacity);
+    console.log("callCache length", wsProvider.getCallCache().length);
+  }, 10 * 60 * 1000);
+
   const appchain = await ApiPromise.create({
     provider: wsProvider,
   });
@@ -148,7 +154,7 @@ async function syncBlocks(appchain: ApiPromise) {
       }
     }
   }
-  setTimeout(() => syncBlocks(appchain), 0);
+  setTimeout(() => syncBlocks(appchain), 6000);
 }
 
 async function syncBlock(appchain: ApiPromise, nextHeight: number) {
