@@ -1,3 +1,4 @@
+import '@polkadot/api-augment';
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import { Account } from "near-api-js";
 import { DetectCodec } from "@polkadot/types/types";
