@@ -68,21 +68,26 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     appchain,
     commitment.commitment
   );
-  // const decoded_messages: any = decodeData(
-  //   {
-  //     Messages: "Vec<Message>",
-  //     Message: {
-  //       nonce: "u64",
-  //       payload_type: "PayloadType",
-  //       payload: "Vec<u8>",
-  //     },
-  //     PayloadType: {
-  //       _enum: ["BurnAsset", "Lock", "PlanNewEra", "EraPayout"],
-  //     },
-  //   },
-  //   encoded_messages
-  // );
-  // console.log("decoded_messages", decoded_messages.toJSON());
+  const decoded_messages: any = decodeData(
+    {
+      Messages: "Vec<Message>",
+      Message: {
+        nonce: "u64",
+        payload_type: "PayloadType",
+        payload: "Vec<u8>",
+      },
+      PayloadType: {
+        _enum: ["Lock", "BurnAsset", "PlanNewEra", "EraPayout", "LockNft"],
+      },
+    },
+    encoded_messages
+  );
+  console.log("decoded_messages", decoded_messages.toJSON())
+  const containEraMessage = decoded_messages.toJSON().findIndex((msg: any) => ["PlanNewEra", "EraPayout"].includes(msg.payload_type)) > -1;
+  console.log("containEraMessage", containEraMessage);
+  if (!containEraMessage) {
+    return await markAsSent(commitment.commitment, 1, "");
+  }
   const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
   const latestFinalizedHeight = getLatestFinalizedHeight();
   console.log("latestFinalizedHeight", latestFinalizedHeight)

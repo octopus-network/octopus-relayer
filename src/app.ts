@@ -18,6 +18,7 @@ import {
 import {
   storeCommitment,
   handleCommitments,
+  getUnmarkedCommitments,
   setRelayMessagesLock,
 } from "./commitments";
 import {
@@ -163,9 +164,9 @@ async function syncBlock(appchain: ApiPromise, nextHeight: number) {
   if (nextHeight <= latestFinalizedHeight) {
     const nextBlockHash = await appchain.rpc.chain.getBlockHash(nextHeight);
     const header = await appchain.rpc.chain.getHeader(nextBlockHash);
-    // logJSON("header", header.toJSON());
     header.digest.logs.forEach(async (log) => {
       if (log.isOther) {
+        logJSON("header number", header.number);
         const commitment = log.asOther.toString();
         await storeCommitment(header.number.toNumber(), commitment);
       }
@@ -226,14 +227,10 @@ async function handleJustification(
 ) {
   console.log("justification", JSON.stringify(justification));
   const isWitnessMode = await checkAnchorIsWitnessMode();
-  const inInterval =
-    Date.now() - lastStateUpdated < updateStateMinInterval * 60 * 1000;
 
-  if (isWitnessMode) {
-    console.log("skip this justification. Reason: anchor is witness-mode");
-    return;
-  }
   const { blockNumber } = justification.commitment;
+  const unMarkedCommitments = await getUnmarkedCommitments(blockNumber.toNumber());
+
   const currBlockHash = await appchain.rpc.chain.getBlockHash(
     blockNumber
   );
@@ -246,11 +243,9 @@ async function handleJustification(
   const previousAuthorities: any = (await appchain.query.beefy.authorities.at(
     previousBlockHash
   )).toJSON();
-
   const isAuthoritiesEqual = isEqual(currentAuthorities, previousAuthorities)
 
-  if (inInterval && isAuthoritiesEqual) {
-    console.log("skip this justification. Reason: in interval");
+  if (isWitnessMode || (unMarkedCommitments.length === 0 && isAuthoritiesEqual)) {
     return;
   }
 
