@@ -227,6 +227,8 @@ async function handleJustification(
 ) {
   console.log("justification", JSON.stringify(justification));
   const isWitnessMode = await checkAnchorIsWitnessMode();
+  // const inInterval =
+  //   Date.now() - lastStateUpdated < updateStateMinInterval * 60 * 1000;
 
   const { blockNumber } = justification.commitment;
   const unMarkedCommitments = await getUnmarkedCommitments(blockNumber.toNumber());
@@ -248,6 +250,11 @@ async function handleJustification(
   if (isWitnessMode || (unMarkedCommitments.length === 0 && isAuthoritiesEqual)) {
     return;
   }
+
+  // if (inInterval) {
+  //   console.log("skip this justification. Reason: in interval");
+  //   return;
+  // }
 
   if (!isAuthoritiesEqual) {
     console.log("Authorities changed!");

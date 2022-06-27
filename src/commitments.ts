@@ -82,7 +82,6 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     },
     encoded_messages
   );
-  console.log("decoded_messages", decoded_messages.toJSON())
   const containEraMessage = decoded_messages.toJSON().findIndex((msg: any) => ["PlanNewEra", "EraPayout"].includes(msg.payload_type)) > -1;
   console.log("containEraMessage", containEraMessage);
   if (!containEraMessage) {
@@ -228,7 +227,7 @@ export async function storeCommitment(
   );
 }
 
-async function getUnmarkedCommitments(height: number): Promise<Commitment[]> {
+export async function getUnmarkedCommitments(height: number): Promise<Commitment[]> {
   const commitments: Commitment[] = await dbAllAsync(
     "SELECT * FROM commitments WHERE height <= ? AND status == 0 ORDER BY height",
     [height]
