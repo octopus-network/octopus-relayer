@@ -9,7 +9,7 @@ import {
 import { confirmProcessingMessages } from "./messages";
 import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
 import { updateStateMinInterval } from "./constants";
-import { MmrLeafProof } from "@polkadot/types/interfaces";
+import { MmrLeafProof, MmrLeafBatchProof } from "@polkadot/types/interfaces";
 
 let relayMessagesLock = false;
 
@@ -99,7 +99,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     return;
   }
 
-  let rawProof: MmrLeafProof | undefined = undefined;
+  let rawProof: MmrLeafBatchProof | undefined = undefined;
   let messageProof: MessageProof | undefined = undefined;
 
   const isWitnessMode = await checkAnchorIsWitnessMode();
@@ -118,7 +118,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     );
     logJSON("blockHashInAnchor", blockHashInAnchor);
     try {
-      rawProof = await appchain.rpc.mmr.generateProof(
+      const rawProof = await appchain.rpc.mmr.generateProof(
         commitment.height,
         blockHashInAnchor
       );
@@ -127,7 +127,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
         messageProof = {
           header: toNumArray(cHeader.toHex()),
           encoded_messages: toNumArray(encoded_messages),
-          mmr_leaf: toNumArray(rawProof.leaf),
+          mmr_leaf: toNumArray(rawProof.leaves),
           mmr_proof: toNumArray(rawProof.proof),
         };
       } else {

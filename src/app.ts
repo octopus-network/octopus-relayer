@@ -227,6 +227,7 @@ async function handleJustification(
 ) {
   console.log("justification", JSON.stringify(justification));
   const isWitnessMode = await checkAnchorIsWitnessMode();
+  console.log("isWitnessMode", isWitnessMode)
   // const inInterval =
   //   Date.now() - lastStateUpdated < updateStateMinInterval * 60 * 1000;
 
@@ -295,7 +296,7 @@ async function handleJustification(
   const lightClientState = {
     signed_commitment: toNumArray(justification.toHex()) as number[],
     validator_proofs: merkleProofs,
-    mmr_leaf: toNumArray(rawMmrProofWrapper.leaf),
+    mmr_leaf: toNumArray(rawMmrProofWrapper.leaves),
     mmr_proof: toNumArray(rawMmrProofWrapper.proof),
   };
 
