@@ -9,7 +9,7 @@ import {
 import { confirmProcessingMessages } from "./messages";
 import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
 import { updateStateMinInterval } from "./constants";
-import { MmrLeafProof, MmrLeafBatchProof } from "@polkadot/types/interfaces";
+import { MmrLeafProof } from "@polkadot/types/interfaces";
 
 let relayMessagesLock = false;
 
@@ -99,7 +99,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     return;
   }
 
-  let rawProof: MmrLeafBatchProof | undefined = undefined;
+  let rawProof: MmrLeafProof | undefined = undefined;
   let messageProof: MessageProof | undefined = undefined;
 
   const isWitnessMode = await checkAnchorIsWitnessMode();
@@ -127,7 +127,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
         messageProof = {
           header: toNumArray(cHeader.toHex()),
           encoded_messages: toNumArray(encoded_messages),
-          mmr_leaf: toNumArray(rawProof.leaves),
+          mmr_leaf: toNumArray(rawProof.leaf),
           mmr_proof: toNumArray(rawProof.proof),
         };
       } else {
@@ -220,7 +220,7 @@ export async function storeCommitment(
   height: number,
   commitment: String
 ): Promise<any> {
-  console.log("storeCommitment", commitment);
+  console.log(`storeCommitment-${height}`, commitment);
   return await dbRunAsync(
     "INSERT INTO commitments(height, commitment, created_at, updated_at, tx_id, status) values(?, ?, datetime('now'), datetime('now'), NULL, 0)",
     [height, commitment]

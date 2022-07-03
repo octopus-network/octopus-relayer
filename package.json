@@ -15,8 +15,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@polkadot/api": "beta 8.9.2-5",
-    "@polkadot/types": "beta 8.9.2-5",
+    "@polkadot/api": "7.15.1",
+    "@polkadot/types": "7.15.1",
     "chalk": "^4.1.1",
     "db-migrate": "^0.11.13",
     "db-migrate-sqlite3": "^0.4.0",
