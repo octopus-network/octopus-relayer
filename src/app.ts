@@ -305,7 +305,7 @@ async function handleSignedCommitment(
     mmr_leaf: toNumArray(rawMmrProofWrapper.leaf),
     mmr_proof: toNumArray(rawMmrProofWrapper.proof),
   };
-  console.log("notificationHistories", util.inspect(lightClientState, { showHidden: false, depth: null, colors: true }))
+  console.log("lightClientState", util.inspect(lightClientState, { showHidden: false, depth: null, colors: true }))
 
   const actionType = "UpdateState";
   try {
