@@ -6,7 +6,7 @@ import { decodeData, logJSON, toNumArray, WsProvider2, decodeSignedCommitment } 
 const keccak256 = require("keccak256");
 const publicKeyToAddress = require("ethereum-public-key-to-address");
 const { MerkleTree } = require("merkletreejs");
-import { initNearRpc, updateState, checkAnchorIsWitnessMode } from "./nearCalls";
+import { initNearRpc, updateState, checkAnchorIsWitnessMode, getLatestCommitmentBlockNumber } from "./nearCalls";
 import { initDb } from "./db";
 import { MerkleProof } from "./interfaces";
 import {
@@ -233,12 +233,14 @@ async function handleSignedCommitment(
 ) {
   const decodedSignedCommitment = decodeSignedCommitment(signedCommitmentHex);
   const isWitnessMode = await checkAnchorIsWitnessMode();
-  // const inInterval =
-  //   Date.now() - lastStateUpdated < updateStateMinInterval * 60 * 1000;
 
+  const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
   const { blockNumber } = decodedSignedCommitment.commitment;
-  const unMarkedCommitments = await getUnmarkedCommitments(blockNumber);
+  if (blockNumberInAnchor >= blockNumber) {
+    return;
+  }
 
+  const unMarkedCommitments = await getUnmarkedCommitments(blockNumber);
   const currBlockHash = await appchain.rpc.chain.getBlockHash(
     blockNumber
   );
