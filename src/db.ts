@@ -30,6 +30,13 @@ export async function initDb() {
   await dbRunAsync(
     "CREATE TABLE IF NOT EXISTS last_message_processing_problems(type INTEGER, tx_id TEXT, failed_at INTEGER, status INTEGER)"
   );
+
+  // 0: inProgress
+  // 1: relayed
+  // 2: failed
+  await dbRunAsync(
+    "CREATE TABLE IF NOT EXISTS sessions(height INTEGER, status INTEGER, failed_at INTEGER)"
+  );
   await migrate();
 }
 
@@ -68,3 +75,12 @@ export const upsertActions = promisify(
     db: db,
   })
 );
+
+export const upsertSessions = promisify(
+  upsert({
+    table: "sessions",
+    key: "height",
+    db: db,
+  })
+);
+

@@ -8,7 +8,7 @@ const publicKeyToAddress = require("ethereum-public-key-to-address");
 const { MerkleTree } = require("merkletreejs");
 import { initNearRpc, updateState, checkAnchorIsWitnessMode, getLatestCommitmentBlockNumber } from "./nearCalls";
 import { initDb } from "./db";
-import { MerkleProof } from "./interfaces";
+import { MerkleProof, Session } from "./interfaces";
 import {
   getNextHeight,
   getLatestFinalizedHeight,
@@ -26,6 +26,12 @@ import {
   confirmAction,
   tryCompleteActions
 } from "./actions";
+import {
+  getLastNotCompletedSession,
+  storeSession,
+  sessionCompleted,
+  markFailedSession
+} from "./sessions";
 import {
   confirmProcessingMessages
 } from "./messages";
@@ -172,6 +178,12 @@ async function syncBlock(appchain: ApiPromise, nextHeight: number) {
         await storeCommitment(header.number.toNumber(), commitment);
       }
     });
+    const apiAt = await appchain.at(nextBlockHash);
+    const events = await apiAt.query.system.events();
+    const containsNewSession = events.findIndex(({ event: { section, method } }) => section === "session" && method === "NewSession") > -1;
+    if (containsNewSession) {
+      await storeSession(nextHeight);
+    }
     let signedCommitmentHex: any;
     if (justificationsHuman) {
       (justificationsHuman as string[]).forEach(justificationHuman => {
@@ -181,8 +193,8 @@ async function syncBlock(appchain: ApiPromise, nextHeight: number) {
       });
     }
     if (signedCommitmentHex) {
-      console.log(`signedCommitmentHex-${nextHeight}`, signedCommitmentHex);
-      handleSignedCommitment(appchain, signedCommitmentHex);
+      const session = await getLastNotCompletedSession();
+      await handleSignedCommitment(appchain, signedCommitmentHex, session);
     }
   }
 }
@@ -229,16 +241,19 @@ function decodeMmrProofWrapper(rawMmrProofWrapper: any): {
 let lastStateUpdated = 0;
 async function handleSignedCommitment(
   appchain: ApiPromise,
-  signedCommitmentHex: string
+  signedCommitmentHex: string,
+  session: Session,
 ) {
   const decodedSignedCommitment = decodeSignedCommitment(signedCommitmentHex);
   const isWitnessMode = await checkAnchorIsWitnessMode();
 
   const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
   const { blockNumber } = decodedSignedCommitment.commitment;
+
   if (blockNumberInAnchor >= blockNumber) {
     return;
   }
+  const isNewSession = session && blockNumber >= session.height
 
   const unMarkedCommitments = await getUnmarkedCommitments(blockNumber);
   const currBlockHash = await appchain.rpc.chain.getBlockHash(
@@ -255,7 +270,7 @@ async function handleSignedCommitment(
   )).toJSON();
   const isAuthoritiesEqual = isEqual(currentAuthorities, previousAuthorities)
 
-  if (isWitnessMode || (unMarkedCommitments.length === 0 && isAuthoritiesEqual)) {
+  if (isWitnessMode || (unMarkedCommitments.length === 0 && (!isNewSession))) {
     return;
   }
 
@@ -315,11 +330,17 @@ async function handleSignedCommitment(
       console.log("done");
       setRelayMessagesLock(true);
       await updateState(lightClientState);
+      if (isNewSession) {
+        await sessionCompleted(session.height);
+      }
       setRelayMessagesLock(false);
       await storeAction(actionType);
       lastStateUpdated = Date.now();
     }
   } catch (err) {
+    if (isNewSession) {
+      await markFailedSession(session.height);
+    }
     setRelayMessagesLock(false);
     console.log(err);
   }
