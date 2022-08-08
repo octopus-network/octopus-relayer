@@ -2,13 +2,13 @@ import '@polkadot/api-augment';
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import { Account } from "near-api-js";
 import { DetectCodec } from "@polkadot/types/types";
-import { decodeData, logJSON, toNumArray, WsProvider2 } from "./utils";
+import { decodeData, logJSON, toNumArray, WsProvider2, decodeSignedCommitment } from "./utils";
 const keccak256 = require("keccak256");
 const publicKeyToAddress = require("ethereum-public-key-to-address");
 const { MerkleTree } = require("merkletreejs");
-import { initNearRpc, updateState, checkAnchorIsWitnessMode } from "./nearCalls";
+import { initNearRpc, updateState, checkAnchorIsWitnessMode, getLatestCommitmentBlockNumber } from "./nearCalls";
 import { initDb } from "./db";
-import { MerkleProof } from "./interfaces";
+import { MerkleProof, Session } from "./interfaces";
 import {
   getNextHeight,
   getLatestFinalizedHeight,
@@ -18,6 +18,7 @@ import {
 import {
   storeCommitment,
   handleCommitments,
+  getUnmarkedCommitments,
   setRelayMessagesLock,
 } from "./commitments";
 import {
@@ -26,11 +27,18 @@ import {
   tryCompleteActions
 } from "./actions";
 import {
+  getLastNotCompletedSession,
+  storeSession,
+  sessionCompleted,
+  markFailedSession
+} from "./sessions";
+import {
   confirmProcessingMessages
 } from "./messages";
 import { LightClientState, ActionType } from "./interfaces";
 const { isEqual } = require("lodash");
 import { appchainEndpoint, updateStateMinInterval } from "./constants";
+const util = require('util')
 
 const BLOCK_SYNC_SIZE = 20;
 const BLOCK_LOG_SIZE = 100;
@@ -71,7 +79,6 @@ async function listening(
   syncBlocks(appchain);
   handleCommitments(appchain);
   subscribeFinalizedHeights(appchain);
-  subscribeJustifications(appchain);
   tryCompleteActions(account, appchain);
 }
 
@@ -162,14 +169,33 @@ async function syncBlock(appchain: ApiPromise, nextHeight: number) {
   const latestFinalizedHeight = getLatestFinalizedHeight();
   if (nextHeight <= latestFinalizedHeight) {
     const nextBlockHash = await appchain.rpc.chain.getBlockHash(nextHeight);
-    const header = await appchain.rpc.chain.getHeader(nextBlockHash);
-    // logJSON("header", header.toJSON());
+    const blockWrapper = await appchain.rpc.chain.getBlock(nextBlockHash);
+    const { block: { header }, justifications } = blockWrapper;
+    const justificationsHuman = justifications.toHuman();
     header.digest.logs.forEach(async (log) => {
       if (log.isOther) {
         const commitment = log.asOther.toString();
         await storeCommitment(header.number.toNumber(), commitment);
       }
     });
+    const apiAt = await appchain.at(nextBlockHash);
+    const events = await apiAt.query.system.events();
+    const containsNewSession = events.findIndex(({ event: { section, method } }) => section === "session" && method === "NewSession") > -1;
+    if (containsNewSession) {
+      await storeSession(nextHeight);
+    }
+    let signedCommitmentHex: any;
+    if (justificationsHuman) {
+      (justificationsHuman as string[]).forEach(justificationHuman => {
+        if (justificationHuman[0] === "BEEF") {
+          signedCommitmentHex = "0x" + justificationHuman[1].slice(4);
+        }
+      });
+    }
+    if (signedCommitmentHex) {
+      const session = await getLastNotCompletedSession();
+      await handleSignedCommitment(appchain, signedCommitmentHex, session);
+    }
   }
 }
 
@@ -212,28 +238,24 @@ function decodeMmrProofWrapper(rawMmrProofWrapper: any): {
   };
 }
 
-function subscribeJustifications(appchain: ApiPromise) {
-  console.log("subscribeJustifications");
-  appchain.rpc.beefy.subscribeJustifications(async (justification) => {
-    await handleJustification(appchain, justification);
-  });
-}
-
 let lastStateUpdated = 0;
-async function handleJustification(
+async function handleSignedCommitment(
   appchain: ApiPromise,
-  justification: DetectCodec<any, any>
+  signedCommitmentHex: string,
+  session: Session,
 ) {
-  console.log("justification", JSON.stringify(justification));
+  const decodedSignedCommitment = decodeSignedCommitment(signedCommitmentHex);
   const isWitnessMode = await checkAnchorIsWitnessMode();
-  const inInterval =
-    Date.now() - lastStateUpdated < updateStateMinInterval * 60 * 1000;
 
-  if (isWitnessMode) {
-    console.log("skip this justification. Reason: anchor is witness-mode");
+  const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
+  const { blockNumber } = decodedSignedCommitment.commitment;
+
+  if (blockNumberInAnchor >= blockNumber) {
     return;
   }
-  const { blockNumber } = justification.commitment;
+  const isNewSession = session && blockNumber >= session.height
+
+  const unMarkedCommitments = await getUnmarkedCommitments(blockNumber);
   const currBlockHash = await appchain.rpc.chain.getBlockHash(
     blockNumber
   );
@@ -246,13 +268,18 @@ async function handleJustification(
   const previousAuthorities: any = (await appchain.query.beefy.authorities.at(
     previousBlockHash
   )).toJSON();
-
   const isAuthoritiesEqual = isEqual(currentAuthorities, previousAuthorities)
 
-  if (inInterval && isAuthoritiesEqual) {
-    console.log("skip this justification. Reason: in interval");
+  if (isWitnessMode || (unMarkedCommitments.length === 0 && (!isNewSession))) {
     return;
   }
+
+  // if (inInterval) {
+  //   console.log("skip this justification. Reason: in interval");
+  //   return;
+  // }
+
+  console.log("decodedSignedCommitment", decodedSignedCommitment.toJSON())
 
   if (!isAuthoritiesEqual) {
     console.log("Authorities changed!");
@@ -260,12 +287,11 @@ async function handleJustification(
   logJSON("previousAuthorities", previousAuthorities);
   logJSON("currentAuthorities", currentAuthorities);
 
-  console.log("justification encode", JSON.stringify(justification.toHex()));
   const rawMmrProofWrapper = await appchain.rpc.mmr.generateProof(
-    Number(justification.commitment.blockNumber) - 1,
+    Number(decodedSignedCommitment.commitment.blockNumber) - 1,
     currBlockHash
   );
-  logJSON("rawMmrProofWrapper", rawMmrProofWrapper);
+  logJSON("rawMmrProofWrapper", rawMmrProofWrapper.toHex());
   const decodedMmrProofWrapper = decodeMmrProofWrapper(rawMmrProofWrapper);
   logJSON("decodedMmrProofWrapper", decodedMmrProofWrapper);
 
@@ -291,22 +317,30 @@ async function handleJustification(
   });
 
   const lightClientState = {
-    signed_commitment: toNumArray(justification.toHex()) as number[],
+    signed_commitment: toNumArray(signedCommitmentHex) as number[],
     validator_proofs: merkleProofs,
     mmr_leaf: toNumArray(rawMmrProofWrapper.leaf),
     mmr_proof: toNumArray(rawMmrProofWrapper.proof),
   };
+  console.log("lightClientState", util.inspect(lightClientState, { showHidden: false, depth: null, colors: true }))
 
   const actionType = "UpdateState";
   try {
     if (await confirmAction(actionType)) {
+      console.log("done");
       setRelayMessagesLock(true);
       await updateState(lightClientState);
+      if (isNewSession) {
+        await sessionCompleted(session.height);
+      }
       setRelayMessagesLock(false);
       await storeAction(actionType);
       lastStateUpdated = Date.now();
     }
   } catch (err) {
+    if (isNewSession) {
+      await markFailedSession(session.height);
+    }
     setRelayMessagesLock(false);
     console.log(err);
   }

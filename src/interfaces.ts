@@ -15,6 +15,12 @@ export interface Action {
   failed_at: number;
 }
 
+export interface Session {
+  height: number;
+  status: number;
+  failed_at: number;
+}
+
 export interface Proof {
   leaf_index: number;
   leaf_count: number;

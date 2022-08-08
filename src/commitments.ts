@@ -10,6 +10,7 @@ import { confirmProcessingMessages } from "./messages";
 import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
 import { updateStateMinInterval } from "./constants";
 import { MmrLeafProof } from "@polkadot/types/interfaces";
+const util = require('util')
 
 let relayMessagesLock = false;
 
@@ -64,31 +65,30 @@ export async function handleCommitments(appchain: ApiPromise) {
 }
 
 async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
+  const latestFinalizedHeight = getLatestFinalizedHeight();
+  if (commitment.height > latestFinalizedHeight) {
+    return;
+  }
+
   const encoded_messages = await getOffchainDataForCommitment(
     appchain,
     commitment.commitment
   );
-  // const decoded_messages: any = decodeData(
-  //   {
-  //     Messages: "Vec<Message>",
-  //     Message: {
-  //       nonce: "u64",
-  //       payload_type: "PayloadType",
-  //       payload: "Vec<u8>",
-  //     },
-  //     PayloadType: {
-  //       _enum: ["BurnAsset", "Lock", "PlanNewEra", "EraPayout"],
-  //     },
-  //   },
-  //   encoded_messages
-  // );
-  // console.log("decoded_messages", decoded_messages.toJSON());
-  const latestFinalizedHeight = getLatestFinalizedHeight();
-  console.log("latestFinalizedHeight", latestFinalizedHeight)
-  console.log("commitment.height", commitment.height)
-  if (commitment.height > latestFinalizedHeight) {
-    return;
-  }
+  const decoded_messages: any = decodeData(
+    {
+      Messages: "Vec<Message>",
+      Message: {
+        nonce: "u64",
+        payload_type: "PayloadType",
+        payload: "Vec<u8>",
+      },
+      PayloadType: {
+        _enum: ["Lock", "BurnAsset", "PlanNewEra", "EraPayout", "LockNft"],
+      },
+    },
+    encoded_messages
+  );
+  console.log("decoded_messages", util.inspect(decoded_messages.toJSON(), { showHidden: false, depth: null, colors: true }));
 
   let rawProof: MmrLeafProof | undefined = undefined;
   let messageProof: MessageProof | undefined = undefined;
@@ -137,8 +137,6 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
   }
 
   if (messageProof) {
-    console.log("latestFinalizedHeight", latestFinalizedHeight);
-    console.log("commitment.height", commitment.height);
     let txId: string = "";
     let failedCall: any = null;
     try {
@@ -216,14 +214,14 @@ export async function storeCommitment(
   height: number,
   commitment: String
 ): Promise<any> {
-  console.log("storeCommitment", commitment);
+  console.log(`storeCommitment-${height}`, commitment);
   return await dbRunAsync(
     "INSERT INTO commitments(height, commitment, created_at, updated_at, tx_id, status) values(?, ?, datetime('now'), datetime('now'), NULL, 0)",
     [height, commitment]
   );
 }
 
-async function getUnmarkedCommitments(height: number): Promise<Commitment[]> {
+export async function getUnmarkedCommitments(height: number): Promise<Commitment[]> {
   const commitments: Commitment[] = await dbAllAsync(
     "SELECT * FROM commitments WHERE height <= ? AND status == 0 ORDER BY height",
     [height]
