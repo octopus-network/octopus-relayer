@@ -10,6 +10,7 @@ import { confirmProcessingMessages } from "./messages";
 import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
 import { updateStateMinInterval } from "./constants";
 import { MmrLeafProof } from "@polkadot/types/interfaces";
+const util = require('util')
 
 let relayMessagesLock = false;
 
@@ -64,6 +65,11 @@ export async function handleCommitments(appchain: ApiPromise) {
 }
 
 async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
+  const latestFinalizedHeight = getLatestFinalizedHeight();
+  if (commitment.height > latestFinalizedHeight) {
+    return;
+  }
+
   const encoded_messages = await getOffchainDataForCommitment(
     appchain,
     commitment.commitment
@@ -82,22 +88,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     },
     encoded_messages
   );
-  const containEraMessage = decoded_messages.toJSON().findIndex((msg: any) => ["PlanNewEra", "EraPayout"].includes(msg.payload_type)) > -1;
-  console.log("containEraMessage", containEraMessage);
-  if (!containEraMessage) {
-    return await markAsSent(commitment.commitment, 1, "");
-  }
-  const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
-  const latestFinalizedHeight = getLatestFinalizedHeight();
-  console.log("latestFinalizedHeight", latestFinalizedHeight)
-  console.log("commitment.height", commitment.height)
-  console.log("blockNumberInAnchor", blockNumberInAnchor)
-  if (
-    commitment.height > latestFinalizedHeight ||
-    blockNumberInAnchor > latestFinalizedHeight
-  ) {
-    return;
-  }
+  console.log("decoded_messages", util.inspect(decoded_messages.toJSON(), { showHidden: false, depth: null, colors: true }));
 
   let rawProof: MmrLeafProof | undefined = undefined;
   let messageProof: MessageProof | undefined = undefined;
@@ -109,40 +100,43 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
       encoded_messages
     );
     messageProof = messageProofWithoutProof(encoded_messages);
-  } else if (commitment.height < blockNumberInAnchor) {
-    console.log("relay messages with proofs");
-    const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height);
-    const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
-    const blockHashInAnchor = await appchain.rpc.chain.getBlockHash(
-      blockNumberInAnchor
-    );
-    logJSON("blockHashInAnchor", blockHashInAnchor);
-    try {
-      const rawProof = await appchain.rpc.mmr.generateProof(
-        commitment.height,
-        blockHashInAnchor
+  } else {
+    const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
+    if (blockNumberInAnchor > latestFinalizedHeight) {
+      return;
+    }
+    if (commitment.height < blockNumberInAnchor) {
+      console.log("relay messages with proofs");
+      const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height);
+      const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
+      const blockHashInAnchor = await appchain.rpc.chain.getBlockHash(
+        blockNumberInAnchor
       );
-      logJSON("rawProof", rawProof);
-      if (rawProof) {
-        messageProof = {
-          header: toNumArray(cHeader.toHex()),
-          encoded_messages: toNumArray(encoded_messages),
-          mmr_leaf: toNumArray(rawProof.leaf),
-          mmr_proof: toNumArray(rawProof.proof),
-        };
-      } else {
+      logJSON("blockHashInAnchor", blockHashInAnchor);
+      try {
+        const rawProof = await appchain.rpc.mmr.generateProof(
+          commitment.height,
+          blockHashInAnchor
+        );
+        logJSON("rawProof", rawProof);
+        if (rawProof) {
+          messageProof = {
+            header: toNumArray(cHeader.toHex()),
+            encoded_messages: toNumArray(encoded_messages),
+            mmr_leaf: toNumArray(rawProof.leaf),
+            mmr_proof: toNumArray(rawProof.proof),
+          };
+        } else {
+          messageProof = messageProofWithoutProof(encoded_messages);
+        }
+      } catch (error) {
+        console.log("generateProof error", error);
         messageProof = messageProofWithoutProof(encoded_messages);
       }
-    } catch (error) {
-      console.log("generateProof error", error);
-      messageProof = messageProofWithoutProof(encoded_messages);
     }
   }
 
   if (messageProof) {
-    console.log("blockNumberInAnchor", blockNumberInAnchor);
-    console.log("latestFinalizedHeight", latestFinalizedHeight);
-    console.log("commitment.height", commitment.height);
     let txId: string = "";
     let failedCall: any = null;
     try {
