@@ -32,7 +32,7 @@ export async function handleCommitments(appchain: ApiPromise) {
       const finalizedHead = await appchain.rpc.chain.getFinalizedHead();
       if (finalizedHead) {
         console.log("test connection: Ok");
-        console.log("finalizedHead", finalizedHead)
+        console.log("finalizedHead", finalizedHead.toHuman())
         return clearTimeout(exitTimer);
       }
     } catch (e) {

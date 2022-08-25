@@ -13,11 +13,15 @@ export function getLatestFinalizedHeight() {
   return latestFinalizedHeight;
 }
 
-export async function subscribeFinalizedHeights(appchain: ApiPromise) {
-  console.log("subscribeFinalizedHeights");
-  return await appchain.rpc.chain.subscribeFinalizedHeads(async (header) => {
-    latestFinalizedHeight = header.number.toNumber();
-  });
+export async function syncFinalizedHeights(appchain: ApiPromise) {
+  try {
+    const latestFinalizedHead = await appchain.rpc.chain.getFinalizedHead();
+    const latestFinalizedHeader = await appchain.rpc.chain.getHeader(latestFinalizedHead);
+    latestFinalizedHeight = latestFinalizedHeader.number.toNumber();
+  } catch (error) {
+    console.log("syncFinalizedHeights error", error)
+  }
+  setTimeout(() => { syncFinalizedHeights(appchain) }, 6000);
 }
 
 export async function getNextHeight(): Promise<number> {

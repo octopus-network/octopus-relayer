@@ -13,7 +13,7 @@ import {
   getNextHeight,
   getLatestFinalizedHeight,
   updateSyncedBlock,
-  subscribeFinalizedHeights,
+  syncFinalizedHeights,
 } from "./blockHeights";
 import {
   storeCommitment,
@@ -75,10 +75,10 @@ async function listening(
   appchain: ApiPromise,
   account: Account,
 ) {
-  console.log("start subscribe");
+  console.log("start syncing");
   syncBlocks(appchain);
   handleCommitments(appchain);
-  subscribeFinalizedHeights(appchain);
+  syncFinalizedHeights(appchain);
   tryCompleteActions(account, appchain);
 }
 
@@ -124,7 +124,7 @@ async function syncBlocks(appchain: ApiPromise) {
       const finalizedHead = await appchain.rpc.chain.getFinalizedHead();
       if (finalizedHead) {
         console.log("test connection: Ok");
-        console.log("finalizedHead", finalizedHead)
+        console.log("finalizedHead", finalizedHead.toHuman())
         return clearTimeout(exitTimer);
       }
     } catch (e) {
