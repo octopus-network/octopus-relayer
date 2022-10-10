@@ -78,9 +78,9 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     {
       Messages: "Vec<Message>",
       Message: {
-        nonce: "u64",
+        nonce: "Compact<u64>",
         payload_type: "PayloadType",
-        payload: "Vec<u8>",
+        payload: "BoundedVec<u8, u32>",
       },
       PayloadType: {
         _enum: ["Lock", "BurnAsset", "PlanNewEra", "EraPayout", "LockNft"],
@@ -202,11 +202,12 @@ async function getOffchainDataForCommitment(
   appchain: ApiPromise,
   commitment: string
 ) {
-  const prefixBuffer = Buffer.from("commitment", "utf8");
-  const key = "0x" + prefixBuffer.toString("hex") + commitment.slice(2);
+  const key = commitment;
+  console.log("key", key)
   const data = (
     await appchain.rpc.offchain.localStorageGet("PERSISTENT", key)
   ).toString();
+  console.log("data", data)
   return data;
 }
 
