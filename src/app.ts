@@ -178,12 +178,14 @@ async function syncBlock(appchain: ApiPromise, nextHeight: number) {
         await storeCommitment(header.number.toNumber(), commitment);
       }
     });
+
     const apiAt = await appchain.at(nextBlockHash);
     const events = await apiAt.query.system.events();
     const containsNewSession = events.findIndex(({ event: { section, method } }) => section === "session" && method === "NewSession") > -1;
     if (containsNewSession) {
       await storeSession(nextHeight);
     }
+
     let signedCommitmentHex: any;
     if (justificationsHuman) {
       (justificationsHuman as string[]).forEach(justificationHuman => {
@@ -246,7 +248,9 @@ async function handleSignedCommitment(
 ) {
   const decodedSignedCommitment = decodeSignedCommitment(signedCommitmentHex);
   const isWitnessMode = await checkAnchorIsWitnessMode();
-
+  if (isWitnessMode) {
+    return;
+  }
   const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
   const { blockNumber } = decodedSignedCommitment.commitment;
 
@@ -270,7 +274,7 @@ async function handleSignedCommitment(
   )).toJSON();
   const isAuthoritiesEqual = isEqual(currentAuthorities, previousAuthorities)
 
-  if (isWitnessMode || (unMarkedCommitments.length === 0 && (!isNewSession))) {
+  if (unMarkedCommitments.length === 0 && (!isNewSession)) {
     return;
   }
 
