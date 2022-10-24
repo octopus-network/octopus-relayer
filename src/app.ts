@@ -20,6 +20,7 @@ import {
   handleCommitments,
   getUnmarkedCommitments,
   setRelayMessagesLock,
+  storeLightClientState,
 } from "./commitments";
 import {
   storeAction,
@@ -300,11 +301,9 @@ async function handleSignedCommitment(
   logJSON("decodedMmrProofWrapper", decodedMmrProofWrapper);
 
   const ethAddrs = currentAuthorities.map((a: string) => publicKeyToAddress(a));
-  console.log("ethAddrs", ethAddrs);
   const leaves = ethAddrs.map((a: string) => keccak256(a));
   const tree = new MerkleTree(leaves, keccak256);
   const root = tree.getRoot().toString("hex");
-  console.log("root", root);
 
   const merkleProofs = leaves.map((leaf: any, index: number) => {
     const proof: string[] = tree.getHexProof(leaf);
@@ -330,16 +329,20 @@ async function handleSignedCommitment(
 
   const actionType = "UpdateState";
   try {
-    if (await confirmAction(actionType)) {
-      console.log("done");
-      setRelayMessagesLock(true);
-      await updateState(lightClientState);
-      if (isNewSession) {
-        await sessionCompleted(session.height);
+    if (isNewSession) {
+      if (await confirmAction(actionType)) {
+        console.log("done");
+        setRelayMessagesLock(true);
+        await updateState(lightClientState);
+        if (isNewSession) {
+          await sessionCompleted(session.height);
+        }
+        setRelayMessagesLock(false);
+        await storeAction(actionType);
+        lastStateUpdated = Date.now();
       }
-      setRelayMessagesLock(false);
-      await storeAction(actionType);
-      lastStateUpdated = Date.now();
+    } else {
+      storeLightClientState({ lightClientState, decodedSignedCommitment });
     }
   } catch (err) {
     if (isNewSession) {

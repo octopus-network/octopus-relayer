@@ -1,7 +1,7 @@
 import { connect, keyStores, utils, Account } from "near-api-js";
 import BN from "bn.js";
 
-import { LightClientState, MessageProof } from "./interfaces";
+import { LightClientState, MessageProof, MessageProofWithLightClientState } from "./interfaces";
 import { logJSON } from "./utils";
 const util = require("util");
 
@@ -43,6 +43,19 @@ export async function relayMessages(args: MessageProof) {
   return await account.functionCall({
     contractId: anchorContractId as string,
     methodName: "verify_and_stage_appchain_messages",
+    args,
+    gas: DEFAULT_GAS,
+    attachedDeposit: new BN("0"),
+  });
+}
+
+export async function relayMessagesWithAllProofs(args: MessageProofWithLightClientState) {
+  console.log("relayMessagesWithAllProofs-----------------------");
+  console.log("\x1b[34m%s\x1b[0m", JSON.stringify(args));
+  console.log("------------------------------------");
+  return await account.functionCall({
+    contractId: anchorContractId as string,
+    methodName: "process_appchain_messages_with_all_proofs",
     args,
     gas: DEFAULT_GAS,
     attachedDeposit: new BN("0"),

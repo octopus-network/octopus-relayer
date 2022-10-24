@@ -1,13 +1,13 @@
 import { ApiPromise } from "@polkadot/api";
 import { decodeData, logJSON, toNumArray } from "./utils";
-import { relayMessages, getLatestCommitmentBlockNumber, checkAnchorIsWitnessMode } from "./nearCalls";
+import { relayMessagesWithAllProofs, getLatestCommitmentBlockNumber, checkAnchorIsWitnessMode } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
 import {
   isActionCompleted,
 } from "./actions";
 import { confirmProcessingMessages } from "./messages";
-import { Commitment, ActionType, MessageProof, Action } from "./interfaces";
+import { Commitment, ActionType, MessageProofWithLightClientState, Action } from "./interfaces";
 import { updateStateMinInterval } from "./constants";
 import { MmrLeafProof } from "@polkadot/types/interfaces";
 const util = require('util')
@@ -64,6 +64,13 @@ export async function handleCommitments(appchain: ApiPromise) {
   setTimeout(() => handleCommitments(appchain), 6000);
 }
 
+let lightClientStateWrapper: any = null;
+export function storeLightClientState(_lightClientStateWrapper: any) {
+  console.log("storeLightClientState", JSON.stringify(_lightClientStateWrapper));
+  lightClientStateWrapper = _lightClientStateWrapper;
+}
+
+
 async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
   const latestFinalizedHeight = getLatestFinalizedHeight();
   if (commitment.height > latestFinalizedHeight) {
@@ -91,7 +98,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
   console.log("decoded_messages", util.inspect(decoded_messages.toJSON(), { showHidden: false, depth: null, colors: true }));
 
   let rawProof: MmrLeafProof | undefined = undefined;
-  let messageProof: MessageProof | undefined = undefined;
+  let messageProof: MessageProofWithLightClientState | undefined = undefined;
 
   const isWitnessMode = await checkAnchorIsWitnessMode();
   if (isWitnessMode) {
@@ -102,37 +109,47 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     messageProof = messageProofWithoutProof(encoded_messages);
   } else {
     const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
-    if (blockNumberInAnchor > latestFinalizedHeight) {
+    if (
+      blockNumberInAnchor > latestFinalizedHeight
+      || !lightClientStateWrapper
+      || commitment.height >= blockNumberInAnchor) {
       return;
     }
-    if (commitment.height < blockNumberInAnchor) {
-      console.log("relay messages with proofs");
-      const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height);
-      const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
-      const blockHashInAnchor = await appchain.rpc.chain.getBlockHash(
-        blockNumberInAnchor
+
+    console.log("relay messages with proofs");
+    const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height);
+    const cHeader = await appchain.rpc.chain.getHeader(cBlockHash);
+    const blockHashInAnchor = await appchain.rpc.chain.getBlockHash(
+      blockNumberInAnchor
+    );
+    logJSON("blockHashInAnchor", blockHashInAnchor);
+    try {
+      const { lightClientState, decodedSignedCommitment } = lightClientStateWrapper;
+      const mmrRootBlockHash = await appchain.rpc.chain.getBlockHash(
+        decodedSignedCommitment.commitment.blockNumber
       );
-      logJSON("blockHashInAnchor", blockHashInAnchor);
-      try {
-        rawProof = await appchain.rpc.mmr.generateProof(
-          commitment.height,
-          blockHashInAnchor
-        );
-        logJSON("rawProof", rawProof);
-        if (rawProof) {
-          messageProof = {
-            header: toNumArray(cHeader.toHex()),
-            encoded_messages: toNumArray(encoded_messages),
-            mmr_leaf: toNumArray(rawProof.leaf),
-            mmr_proof: toNumArray(rawProof.proof),
-          };
-        } else {
-          messageProof = messageProofWithoutProof(encoded_messages);
-        }
-      } catch (error) {
-        console.log("generateProof error", error);
+      rawProof = await appchain.rpc.mmr.generateProof(
+        commitment.height,
+        mmrRootBlockHash
+      );
+      logJSON("rawProof", rawProof);
+      if (rawProof) {
+        messageProof = {
+          signed_commitment: lightClientState.signed_commitment,
+          validator_proofs: lightClientState.validator_proofs,
+          mmr_leaf_for_mmr_root: lightClientState.mmr_leaf,
+          mmr_proof_for_mmr_root: lightClientState.mmr_proof,
+          encoded_messages: toNumArray(encoded_messages),
+          header: toNumArray(cHeader.toHex()),
+          mmr_leaf_for_header: toNumArray(rawProof.leaf),
+          mmr_proof_for_header: toNumArray(rawProof.proof),
+        };
+      } else {
         messageProof = messageProofWithoutProof(encoded_messages);
       }
+    } catch (error) {
+      console.log("generateProof error", error);
+      messageProof = messageProofWithoutProof(encoded_messages);
     }
   }
 
@@ -150,7 +167,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
         return;
       }
 
-      const callResult: any = await relayMessages(messageProof);
+      const callResult: any = await relayMessagesWithAllProofs(messageProof);
       if (callResult.transaction_outcome) {
         txId = callResult.transaction_outcome.id;
       }
@@ -182,12 +199,16 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
   }
 }
 
-function messageProofWithoutProof(encoded_messages: string): MessageProof {
+function messageProofWithoutProof(encoded_messages: string): MessageProofWithLightClientState {
   return {
-    header: [] as number[],
-    encoded_messages: toNumArray(encoded_messages),
-    mmr_leaf: [] as number[],
-    mmr_proof: [] as number[],
+    signed_commitment: [],
+    validator_proofs: [],
+    mmr_leaf_for_mmr_root: [],
+    mmr_proof_for_mmr_root: [],
+    encoded_messages: [],
+    header: [],
+    mmr_leaf_for_header: [],
+    mmr_proof_for_header: []
   };
 }
 

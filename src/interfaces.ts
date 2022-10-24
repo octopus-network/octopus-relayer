@@ -60,6 +60,17 @@ export interface MessageProof {
   mmr_proof: number[];
 }
 
+export interface MessageProofWithLightClientState {
+  signed_commitment: number[];
+  validator_proofs: MerkleProof[];
+  mmr_leaf_for_mmr_root: number[];
+  mmr_proof_for_mmr_root: number[];
+  encoded_messages: number[];
+  header: number[];
+  mmr_leaf_for_header: number[];
+  mmr_proof_for_header: number[];
+}
+
 export interface LightClientState {
   signed_commitment: number[];
   validator_proofs: MerkleProof[];
