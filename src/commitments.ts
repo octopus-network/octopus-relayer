@@ -1,13 +1,13 @@
 import { ApiPromise } from "@polkadot/api";
 import { decodeData, logJSON, toNumArray } from "./utils";
-import { relayMessagesWithAllProofs, getLatestCommitmentBlockNumber, checkAnchorIsWitnessMode } from "./nearCalls";
+import { relayMessagesWithAllProofs, getLatestCommitmentBlockNumber, checkAnchorIsWitnessMode, relayMessages } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
 import {
   isActionCompleted,
 } from "./actions";
 import { confirmProcessingMessages } from "./messages";
-import { Commitment, ActionType, MessageProofWithLightClientState, Action } from "./interfaces";
+import { Commitment, ActionType, MessageProof, MessageProofWithLightClientState, Action } from "./interfaces";
 import { updateStateMinInterval } from "./constants";
 import { MmrLeafProof } from "@polkadot/types/interfaces";
 const util = require('util')
@@ -98,7 +98,8 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
   console.log("decoded_messages", util.inspect(decoded_messages.toJSON(), { showHidden: false, depth: null, colors: true }));
 
   let rawProof: MmrLeafProof | undefined = undefined;
-  let messageProof: MessageProofWithLightClientState | undefined = undefined;
+  let messageProofWithState: MessageProofWithLightClientState | undefined = undefined;
+  let messageProofWithoutState: MessageProof | undefined = undefined;
 
   const isWitnessMode = await checkAnchorIsWitnessMode();
   if (isWitnessMode) {
@@ -106,7 +107,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
       "witnessMode ===== relay messages without proofs",
       encoded_messages
     );
-    messageProof = messageProofWithoutProof(encoded_messages);
+    messageProofWithoutState = messageProofWithoutProof(encoded_messages);
   } else {
     const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber());
     if (
@@ -134,7 +135,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
       );
       logJSON("rawProof", rawProof);
       if (rawProof) {
-        messageProof = {
+        messageProofWithState = {
           signed_commitment: lightClientState.signed_commitment,
           validator_proofs: lightClientState.validator_proofs,
           mmr_leaf_for_mmr_root: lightClientState.mmr_leaf,
@@ -145,15 +146,15 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
           mmr_proof_for_header: toNumArray(rawProof.proof),
         };
       } else {
-        messageProof = messageProofWithoutProof(encoded_messages);
+        messageProofWithoutState = messageProofWithoutProof(encoded_messages);
       }
     } catch (error) {
       console.log("generateProof error", error);
-      messageProof = messageProofWithoutProof(encoded_messages);
+      messageProofWithoutState = messageProofWithoutProof(encoded_messages);
     }
   }
 
-  if (messageProof) {
+  if (messageProofWithState || messageProofWithoutState) {
     let txId: string = "";
     let failedCall: any = null;
     try {
@@ -167,7 +168,12 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
         return;
       }
 
-      const callResult: any = await relayMessagesWithAllProofs(messageProof);
+      let callResult: any;
+      if (messageProofWithState) {
+        callResult = await relayMessagesWithAllProofs(messageProofWithState);
+      } else if (messageProofWithoutState) {
+        callResult = await relayMessages(messageProofWithoutState);
+      }
       if (callResult.transaction_outcome) {
         txId = callResult.transaction_outcome.id;
       }
@@ -199,16 +205,12 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
   }
 }
 
-function messageProofWithoutProof(encoded_messages: string): MessageProofWithLightClientState {
+function messageProofWithoutProof(encoded_messages: string): MessageProof {
   return {
-    signed_commitment: [],
-    validator_proofs: [],
-    mmr_leaf_for_mmr_root: [],
-    mmr_proof_for_mmr_root: [],
-    encoded_messages: [],
+    encoded_messages: toNumArray(encoded_messages),
     header: [],
-    mmr_leaf_for_header: [],
-    mmr_proof_for_header: []
+    mmr_leaf: [],
+    mmr_proof: [],
   };
 }
 
