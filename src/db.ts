@@ -60,6 +60,14 @@ export const upsertLastSyncedBlocks = promisify(
   })
 );
 
+export const upsertCommitments = promisify(
+  upsert({
+    table: "commitments",
+    key: "height",
+    db: db,
+  })
+);
+
 export const upsertMessageProcessingProblems = promisify(
   upsert({
     table: "last_message_processing_problems",

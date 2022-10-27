@@ -2,7 +2,7 @@ import { ApiPromise } from "@polkadot/api";
 import { decodeData, logJSON, toNumArray } from "./utils";
 import { relayMessagesWithAllProofs, getLatestCommitmentBlockNumber, checkAnchorIsWitnessMode, relayMessages } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
-import { dbRunAsync, dbAllAsync, dbGetAsync } from "./db";
+import { dbRunAsync, dbAllAsync, dbGetAsync, upsertCommitments } from "./db";
 import {
   isActionCompleted,
 } from "./actions";
@@ -239,10 +239,14 @@ export async function storeCommitment(
   commitment: String
 ): Promise<any> {
   console.log(`storeCommitment-${height}`, commitment);
-  return await dbRunAsync(
-    "INSERT INTO commitments(height, commitment, created_at, updated_at, tx_id, status) values(?, ?, datetime('now'), datetime('now'), NULL, 0)",
-    [height, commitment]
-  );
+  return await upsertCommitments({
+    height,
+    commitment,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    tx_id: null,
+    status: 0,
+  });
 }
 
 export async function getUnmarkedCommitments(height: number): Promise<Commitment[]> {
