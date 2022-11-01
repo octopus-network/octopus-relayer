@@ -81,6 +81,7 @@ async function listening(
   handleCommitments(appchain);
   syncFinalizedHeights(appchain);
   tryCompleteActions(account, appchain);
+  confirmProcessingMessages();
 }
 
 async function handleDisconnected(
@@ -105,7 +106,6 @@ async function handleConnected(
   console.log("provider.isConnected", provider.isConnected);
   console.log("appchain.isConnected", appchain.isConnected);
   tryCompleteActions(account, appchain);
-  confirmProcessingMessages();
 }
 
 let lastSyncBlocksLog = 0;
