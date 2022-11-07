@@ -214,7 +214,7 @@ function decodeMmrProofWrapper(rawMmrProofWrapper: any): {
         version: "u8",
         parent_number_and_hash: "(u32, Hash)",
         beefy_next_authority_set: "BeefyNextAuthoritySet",
-        parachain_heads: "Hash",
+        leaf_extra: "Vec<u8>",
       },
       BeefyNextAuthoritySet: {
         id: "u64",
@@ -284,21 +284,20 @@ async function handleSignedCommitment(
   //   return;
   // }
 
-  console.log("decodedSignedCommitment", decodedSignedCommitment.toJSON())
+  console.log("decodedSignedCommitment", util.inspect(decodedSignedCommitment.toJSON(), { showHidden: false, depth: null, colors: true }))
 
   if (!isAuthoritiesEqual) {
     console.log("Authorities changed!");
   }
   logJSON("previousAuthorities", previousAuthorities);
   logJSON("currentAuthorities", currentAuthorities);
-
   const rawMmrProofWrapper = await appchain.rpc.mmr.generateProof(
     Number(decodedSignedCommitment.commitment.blockNumber) - 1,
     currBlockHash
   );
-  logJSON("rawMmrProofWrapper", rawMmrProofWrapper.toHex());
-  const decodedMmrProofWrapper = decodeMmrProofWrapper(rawMmrProofWrapper);
-  logJSON("decodedMmrProofWrapper", decodedMmrProofWrapper);
+  logJSON("rawMmrProofWrapper", rawMmrProofWrapper.toJSON());
+  // const decodedMmrProofWrapper = decodeMmrProofWrapper(rawMmrProofWrapper);
+  // logJSON("decodedMmrProofWrapper", decodedMmrProofWrapper);
 
   const ethAddrs = currentAuthorities.map((a: string) => publicKeyToAddress(a));
   const leaves = ethAddrs.map((a: string) => keccak256(a));

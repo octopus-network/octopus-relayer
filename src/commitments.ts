@@ -226,11 +226,9 @@ async function getOffchainDataForCommitment(
   commitment: string
 ) {
   const key = commitment;
-  console.log("key", key)
   const data = (
     await appchain.rpc.offchain.localStorageGet("PERSISTENT", key)
   ).toString();
-  console.log("data", data)
   return data;
 }
 
