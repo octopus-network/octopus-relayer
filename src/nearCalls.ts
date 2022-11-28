@@ -116,6 +116,20 @@ export async function checkAnchorIsWitnessMode() {
   }
 }
 
+export async function checkAnchorMessagesNeedProcess() {
+  try {
+    const anchorStatus = await getAnchorStatus();
+    if (anchorStatus) {
+      const { max_nonce_of_staged_appchain_messages, latest_applied_appchain_message_nonce } = anchorStatus.permissionless_actions_status;
+      return max_nonce_of_staged_appchain_messages > latest_applied_appchain_message_nonce;
+    }
+    return false;
+  } catch (error) {
+    console.error("checkAnchorIsWitnessMode error", error);
+    return false;
+  }
+}
+
 export async function tryComplete(methodName: string) {
   console.log("tryComplete", methodName);
   const tryCompleteResult: any = await account.functionCall({
@@ -141,6 +155,15 @@ export async function getAnchorSettings() {
   const anchorSettings = await account.viewFunction(
     anchorContractId as string,
     "get_anchor_settings",
+    {}
+  );
+  return anchorSettings;
+}
+
+export async function getAnchorStatus() {
+  const anchorSettings = await account.viewFunction(
+    anchorContractId as string,
+    "get_anchor_status",
     {}
   );
   return anchorSettings;

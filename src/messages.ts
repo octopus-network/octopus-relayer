@@ -1,6 +1,6 @@
 import { Account } from "near-api-js";
 import { ApiPromise } from "@polkadot/api";
-import { tryComplete, getAnchorSettings, processAppchainMessages } from "./nearCalls";
+import { tryComplete, getAnchorSettings, processAppchainMessages, checkAnchorMessagesNeedProcess } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, upsertActions, dbGetAsync, upsertMessageProcessingProblems } from "./db";
 import { Action, ActionType } from "./interfaces";
@@ -10,7 +10,9 @@ import { updateStateMinInterval } from "./constants";
 export async function confirmProcessingMessages(): Promise<boolean | undefined> {
   try {
     const healthy = await isProcessingHealthy();
-    if (healthy) {
+    const needProcess = await checkAnchorMessagesNeedProcess();
+
+    if (healthy && needProcess) {
       const { result, returnVal } = await processAppchainMessages();
       await unmarkLastProblem();
       if (returnVal === "NeedMoreGas") {

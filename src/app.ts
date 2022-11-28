@@ -2,7 +2,7 @@ import '@polkadot/api-augment';
 import { ApiPromise, WsProvider } from "@polkadot/api";
 import { Account } from "near-api-js";
 import { DetectCodec } from "@polkadot/types/types";
-import { decodeData, logJSON, toNumArray, WsProvider2, decodeSignedCommitment } from "./utils";
+import { decodeData, logJSON, toNumArray, WsProvider2, decodeV1SignedCommitment } from "./utils";
 const keccak256 = require("keccak256");
 const publicKeyToAddress = require("ethereum-public-key-to-address");
 const { MerkleTree } = require("merkletreejs");
@@ -80,8 +80,8 @@ async function listening(
   syncBlocks(appchain);
   handleCommitments(appchain);
   syncFinalizedHeights(appchain);
-  tryCompleteActions(account, appchain);
   confirmProcessingMessages();
+  tryCompleteActions(account, appchain);
 }
 
 async function handleDisconnected(
@@ -105,6 +105,7 @@ async function handleConnected(
 ) {
   console.log("provider.isConnected", provider.isConnected);
   console.log("appchain.isConnected", appchain.isConnected);
+  confirmProcessingMessages();
   tryCompleteActions(account, appchain);
 }
 
@@ -191,7 +192,7 @@ async function syncBlock(appchain: ApiPromise, nextHeight: number) {
     if (justificationsHuman) {
       (justificationsHuman as string[]).forEach(justificationHuman => {
         if (justificationHuman[0] === "BEEF") {
-          signedCommitmentHex = "0x" + justificationHuman[1].slice(4);
+          signedCommitmentHex = justificationHuman[1];
         }
       });
     }
@@ -247,7 +248,7 @@ async function handleSignedCommitment(
   signedCommitmentHex: string,
   session: Session,
 ) {
-  const decodedSignedCommitment = decodeSignedCommitment(signedCommitmentHex);
+  const decodedSignedCommitment = decodeV1SignedCommitment(signedCommitmentHex);
   const isWitnessMode = await checkAnchorIsWitnessMode();
   if (isWitnessMode) {
     return;
@@ -291,6 +292,9 @@ async function handleSignedCommitment(
   }
   logJSON("previousAuthorities", previousAuthorities);
   logJSON("currentAuthorities", currentAuthorities);
+
+  console.log("blockNumber======", blockNumber.toNumber())
+  logJSON("currBlockHash", currBlockHash);
   const rawMmrProofWrapper = await appchain.rpc.mmr.generateProof(
     Number(decodedSignedCommitment.commitment.blockNumber) - 1,
     currBlockHash

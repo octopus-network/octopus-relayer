@@ -36,7 +36,7 @@ function hexStringToNumArray(hex: string): number[] {
 }
 
 
-export function decodeSignedCommitment(hashString: string) {
+export function decodeV1SignedCommitment(hashString: string) {
   const decodedSignedCommitment = decodeData(
     {
       BeefySignedCommitment: {
@@ -59,7 +59,7 @@ export function decodeSignedCommitment(hashString: string) {
       MmrRootHash: 'H256',
       ValidatorSetId: 'u64',
       BeefyPayloadId: "[u8; 2]"
-    }, hashString
+    }, "0x" + hashString.slice(4)
   );
   return decodedSignedCommitment;
 }
