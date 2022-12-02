@@ -38,7 +38,7 @@ import {
 } from "./messages";
 import { LightClientState, ActionType } from "./interfaces";
 const { isEqual } = require("lodash");
-import { appchainEndpoint, updateStateMinInterval } from "./constants";
+import { appchainSetting, updateStateMinInterval } from "./constants";
 const util = require('util')
 
 const BLOCK_SYNC_SIZE = 20;
@@ -47,7 +47,7 @@ const BLOCK_LOG_SIZE = 100;
 async function start() {
   await initDb();
   const account = await initNearRpc();
-  const wsProvider = new WsProvider2(appchainEndpoint);
+  const wsProvider = new WsProvider2(appchainSetting.wsRpcEndpoint);
 
   setInterval(() => {
     console.log("callCache capacity", wsProvider.getCallCache().capacity);

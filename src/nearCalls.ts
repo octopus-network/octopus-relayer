@@ -8,29 +8,32 @@ const util = require("util");
 const DEFAULT_GAS = new BN("300000000000000");
 
 import {
-  anchorContractId,
-  nodeEnv,
-  relayerId,
-  relayerPrivateKey,
-  nearNodeUrl,
-  nearWalletUrl,
-  nearHelperUrl,
+  nearSettings,
+  appchainSetting,
+  contracts,
+  relayerNearAccount,
 } from "./constants";
 
 let account: Account;
 
+const { registryContract } = contracts;
+const anchorContractId = `${appchainSetting.appchainId}.${registryContract}`;
+
 export async function initNearRpc() {
-  const keyPair = utils.KeyPair.fromString(relayerPrivateKey as string);
+  const { nearEnv, nearNodeUrl, walletUrl, helperUrl } = nearSettings;
+  const { id: relayerId, privateKey } = relayerNearAccount;
+
+  const keyPair = utils.KeyPair.fromString(privateKey as string);
 
   const keyStore = new keyStores.InMemoryKeyStore();
-  keyStore.setKey(nodeEnv, relayerId, keyPair);
+  keyStore.setKey(nearEnv, relayerId, keyPair);
 
   const near = await connect({
-    networkId: nodeEnv,
+    networkId: nearEnv,
     keyStore,
     nodeUrl: nearNodeUrl as string,
-    walletUrl: nearWalletUrl,
-    helperUrl: nearHelperUrl,
+    walletUrl,
+    helperUrl,
   });
   account = await near.account(relayerId);
   return account;
@@ -161,10 +164,10 @@ export async function getAnchorSettings() {
 }
 
 export async function getAnchorStatus() {
-  const anchorSettings = await account.viewFunction(
+  const anchorStatus = await account.viewFunction(
     anchorContractId as string,
     "get_anchor_status",
     {}
   );
-  return anchorSettings;
+  return anchorStatus;
 }
