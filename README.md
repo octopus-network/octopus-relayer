@@ -22,7 +22,7 @@ export RELAYER_NEAR_ACCOUNT="{ \"id\": \"test-relayer.testnet\", \"privateKey\":
 export APPCHAIN_ID=barnacle0928
 export START_BLOCK_HEIGHT=1
 export UPDATE_STATE_MIN_INTERVAL=60
-
+export TEE_ENDPOINT="http://4.196.190.75:8080"
 ```
 
 ```
