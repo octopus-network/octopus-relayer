@@ -7,6 +7,7 @@
     "dev": "ts-node-dev ./src/app.ts",
     "migrate-up": "node node_modules/db-migrate/bin/db-migrate up -c 1",
     "migrate-down": "node node_modules/db-migrate/bin/db-migrate down -c 1",
+    "print": "ts-node-dev ./src/printMessages.ts",
     "build": "tsc -p .",
     "buildRun": "tsc & node ./dist/app.js",
     "start": "node ./dist/app.js"
@@ -25,6 +26,7 @@
     "keccak256": "^1.0.3",
     "lodash": "^4.17.21",
     "merkletreejs": "^0.2.24",
+    "messages-decoder": "https://github.com/octopus-network/messages-decoder.git",
     "near-api-js": "^0.41.0",
     "snake-camel": "^1.0.8",
     "sqlite3": "^5.0.2",

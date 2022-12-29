@@ -49,27 +49,30 @@ async function start() {
   const account = await initNearRpc();
   const wsProvider = new WsProvider2(appchainSetting.wsRpcEndpoint);
 
-  setInterval(() => {
-    console.log("callCache capacity", wsProvider.getCallCache().capacity);
-    console.log("callCache length", wsProvider.getCallCache().length);
-  }, 10 * 60 * 1000);
+  const exitTimer = setTimeout(() => {
+    console.error("init polkadotjs expired: always pending");
+    process.exit(1)
+  }, 60 * 1000);
 
   const appchain = await ApiPromise.create({
     provider: wsProvider,
   });
-  listening(appchain, account);
-  wsProvider.on("error", (error) =>
-    console.log("provider", "error", JSON.stringify(error))
-  );
-  appchain.on("disconnected", () =>
-    handleDisconnected(wsProvider, appchain)
-  );
-  appchain.on("connected", () =>
-    handleConnected(account, wsProvider, appchain)
-  );
-  appchain.on("error", (error) =>
-    console.log("api", "error", JSON.stringify(error))
-  );
+  if (appchain) {
+    clearTimeout(exitTimer);
+    listening(appchain, account);
+    wsProvider.on("error", (error) =>
+      console.log("provider", "error", JSON.stringify(error))
+    );
+    appchain.on("disconnected", () =>
+      handleDisconnected(wsProvider, appchain)
+    );
+    appchain.on("connected", () =>
+      handleConnected(account, wsProvider, appchain)
+    );
+    appchain.on("error", (error) =>
+      console.log("api", "error", JSON.stringify(error))
+    );
+  }
 }
 
 async function listening(

@@ -1,5 +1,5 @@
 import { ApiPromise } from "@polkadot/api";
-import { decodeData, logJSON, toNumArray } from "./utils";
+import { logJSON, toNumArray } from "./utils";
 import { relayMessagesWithAllProofs, getLatestCommitmentBlockNumber, checkAnchorIsWitnessMode, relayMessages } from "./nearCalls";
 import { getNextHeight, getLatestFinalizedHeight } from "./blockHeights";
 import { dbRunAsync, dbAllAsync, dbGetAsync, upsertCommitments } from "./db";
@@ -8,8 +8,8 @@ import {
 } from "./actions";
 import { confirmProcessingMessages } from "./messages";
 import { Commitment, ActionType, MessageProof, MessageProofWithLightClientState, Action } from "./interfaces";
-import { updateStateMinInterval } from "./constants";
 import { MmrLeafProof } from "@polkadot/types/interfaces";
+const { decodeMessages } = require("messages-decoder");
 const util = require('util')
 
 let relayMessagesLock = false;
@@ -81,20 +81,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     appchain,
     commitment.commitment
   );
-  const decoded_messages: any = decodeData(
-    {
-      Messages: "Vec<Message>",
-      Message: {
-        nonce: "Compact<u64>",
-        payload_type: "PayloadType",
-        payload: "BoundedVec<u8, u32>",
-      },
-      PayloadType: {
-        _enum: ["Lock", "BurnAsset", "PlanNewEra", "EraPayout", "LockNft"],
-      },
-    },
-    encoded_messages
-  );
+  const decoded_messages: any = decodeMessages(encoded_messages);
   console.log("decoded_messages", util.inspect(decoded_messages.toJSON(), { showHidden: false, depth: null, colors: true }));
 
   let rawProof: MmrLeafProof | undefined = undefined;
@@ -221,7 +208,7 @@ async function markAsSent(commitment: string, status: number, txId: string) {
   );
 }
 
-async function getOffchainDataForCommitment(
+export async function getOffchainDataForCommitment(
   appchain: ApiPromise,
   commitment: string
 ) {
@@ -258,7 +245,7 @@ export async function getUnmarkedCommitments(height: number): Promise<Commitment
   }));
 }
 
-async function getCommitments(): Promise<Commitment[]> {
+export async function getCommitments(): Promise<Commitment[]> {
   const commitments: Commitment[] = await dbAllAsync(
     "SELECT * FROM commitments  ORDER BY height"
   );
