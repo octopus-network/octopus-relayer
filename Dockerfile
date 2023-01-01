@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN apt-get install -y git
+RUN apt-get update && apt-get install -y git
 
 # Create and change to the app directory.
 WORKDIR /usr/src/app
