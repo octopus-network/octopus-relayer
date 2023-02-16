@@ -81,8 +81,9 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     appchain,
     commitment.commitment
   );
+  console.log("encoded_messages: ", encoded_messages);
   const decoded_messages: any = decodeMessages(encoded_messages);
-  console.log("decoded_messages", util.inspect(decoded_messages.toJSON(), { showHidden: false, depth: null, colors: true }));
+  console.log("decoded_messages: ", util.inspect(decoded_messages.toString(), { showHidden: false, depth: null, colors: true }));
 
   let rawProof: MmrLeafProof | undefined = undefined;
   let messageProofWithState: MessageProofWithLightClientState | undefined = undefined;
@@ -116,8 +117,8 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
       const mmrRootBlockHash = await appchain.rpc.chain.getBlockHash(
         decodedSignedCommitment.commitment.blockNumber
       );
-      rawProof = await appchain.rpc.mmr.generateProof(
-        commitment.height,
+      rawProof = await appchain.rpc.mmr.generateBatchProof(
+        [commitment.height],
         mmrRootBlockHash
       );
       logJSON("rawProof", rawProof);

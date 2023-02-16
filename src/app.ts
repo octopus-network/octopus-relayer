@@ -47,7 +47,7 @@ const BLOCK_LOG_SIZE = 100;
 async function start() {
   await initDb();
   const account = await initNearRpc();
-  const wsProvider = new WsProvider2(appchainSetting.wsRpcEndpoint);
+  const wsProvider = new WsProvider2(appchainSetting.wsRpcEndpoint, 300 * 1000, undefined, 180 * 1000);
 
   const exitTimer = setTimeout(() => {
     console.error("init polkadotjs expired: always pending");
@@ -298,8 +298,8 @@ async function handleSignedCommitment(
 
   console.log("blockNumber======", blockNumber.toNumber())
   logJSON("currBlockHash", currBlockHash);
-  const rawMmrProofWrapper = await appchain.rpc.mmr.generateProof(
-    Number(decodedSignedCommitment.commitment.blockNumber) - 1,
+  const rawMmrProofWrapper = await appchain.rpc.mmr.generateBatchProof(
+    [Number(decodedSignedCommitment.commitment.blockNumber) - 1],
     currBlockHash
   );
   logJSON("rawMmrProofWrapper", rawMmrProofWrapper.toJSON());
