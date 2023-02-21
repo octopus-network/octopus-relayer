@@ -8,6 +8,7 @@ import {
   decodeV1SignedCommitment,
 } from './utils'
 import keccak256 from 'keccak256'
+// @ts-ignore
 import publicKeyToAddress from 'ethereum-public-key-to-address'
 import MerkleTree from 'merkletreejs'
 import {
