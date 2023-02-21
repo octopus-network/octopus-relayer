@@ -40,6 +40,7 @@ import {
   markFailedSession,
 } from './sessions'
 import { confirmProcessingMessages } from './messages'
+// @ts-ignore
 import { isEqual } from 'lodash'
 import { appchainSetting, MINUTE, SECOND } from './constants'
 import util from 'util'
