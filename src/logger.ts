@@ -3,14 +3,12 @@ import chalk from 'chalk'
 
 const { format, transports } = winston
 
-
 class Logger {
-
-  constructor() { }
+  constructor() {}
 
   getFormat(label: string, colorize: boolean) {
     return format.combine(
-      (colorize ? format.colorize() : format.simple()),
+      colorize ? format.colorize() : format.simple(),
       format.label({ label }),
       format.splat(),
       format.timestamp(),
@@ -24,13 +22,11 @@ class Logger {
   getConsoleLogger(label: string, level: LOGGING_LEVEL) {
     // display console log with colors
     const format = this.getFormat(label, true)
-    return winston.createLogger(
-      {
-        format,
-        transports: [new transports.Console()],
-        level
-      }
-    )
+    return winston.createLogger({
+      format,
+      transports: [new transports.Console()],
+      level,
+    })
   }
 
   getFileLogger(label: string, level: LOGGING_LEVEL) {
@@ -38,22 +34,18 @@ class Logger {
     return winston.createLogger({
       format,
       transports: [new transports.File({ filename: `./log/${label}.log` })],
-      level
+      level,
     })
   }
-
 }
-
-
 
 export enum LOGGING_LEVEL {
   ERROR = 'error',
   WARN = 'warn',
-  INFO = "info",
-  VERBOSE = "verbose",
+  INFO = 'info',
+  VERBOSE = 'verbose',
   DEBUG = 'debug',
-  SILLY = 'silly'
+  SILLY = 'silly',
 }
-
 
 export default new Logger()

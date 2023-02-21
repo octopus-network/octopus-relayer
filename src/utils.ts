@@ -1,6 +1,6 @@
 import { TypeRegistry, createType } from "@polkadot/types";
 import { DetectCodec } from "@polkadot/types/types";
-import { ApiPromise, WsProvider } from "@polkadot/api";
+import { WsProvider } from "@polkadot/api";
 import { LRUCache } from '@polkadot/rpc-provider/lru';
 
 export class WsProvider2 extends WsProvider {
