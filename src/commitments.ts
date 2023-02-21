@@ -17,8 +17,8 @@ import {
 } from './interfaces'
 import { MmrLeafProof } from '@polkadot/types/interfaces'
 import { SECOND, MINUTE } from './constants'
-const { decodeMessages } = require('messages-decoder')
-const util = require('util')
+import decodeMessages from 'messages-decoder'
+import util from 'util'
 
 let relayMessagesLock = false
 
