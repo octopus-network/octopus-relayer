@@ -53,6 +53,13 @@ export interface MerkleProof {
   leaf: number[];
 }
 
+export interface MerkleProof2 {
+  proof: number[][];
+  number_of_leaves: number;
+  leaf_index: number;
+  leaf: number[];
+}
+
 export interface MessageProof {
   encoded_messages: number[];
   header: number[];
@@ -76,4 +83,9 @@ export interface LightClientState {
   validator_proofs: MerkleProof[];
   mmr_leaf: number[];
   mmr_proof: number[];
+}
+
+export interface MessageWithSignature {
+  encoded_messages: number[];
+  verification_proxy_signature: number[];
 }

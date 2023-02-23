@@ -4,6 +4,7 @@ import {
   LightClientState,
   MessageProof,
   MessageProofWithLightClientState,
+  MessageWithSignature,
 } from './interfaces'
 
 const DEFAULT_GAS = new BN('300000000000000')
@@ -47,6 +48,20 @@ export async function relayMessages(args: MessageProof) {
   return await account.functionCall({
     contractId: anchorContractId as string,
     methodName: 'verify_and_stage_appchain_messages',
+    args,
+    gas: DEFAULT_GAS,
+    attachedDeposit: new BN('0'),
+  })
+}
+
+export async function relayMessagesWithSignature(args: MessageWithSignature) {
+  console.log('relayMessagesWithSignature-----------------------')
+  console.log('\x1b[34m%s\x1b[0m', JSON.stringify(args))
+  // Need check:
+  console.log('------------------------------------')
+  return await account.functionCall({
+    contractId: anchorContractId as string,
+    methodName: 'stage_and_apply_appchain_messages',
     args,
     gas: DEFAULT_GAS,
     attachedDeposit: new BN('0'),

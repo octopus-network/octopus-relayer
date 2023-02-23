@@ -16,18 +16,22 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@polkadot/api": "9.6.2",
-    "@polkadot/types": "9.6.2",
+    "@dfinity/agent": "^0.15.4",
+    "@dfinity/identity": "^0.15.4",
+    "@polkadot/api": "^9.6.2",
+    "@polkadot/types": "^9.6.2",
     "chalk": "^4.1.1",
     "db-migrate": "^0.11.13",
     "db-migrate-sqlite3": "^0.4.0",
     "dotenv": "^10.0.0",
     "ethereum-public-key-to-address": "^0.0.5",
+    "isomorphic-fetch": "^3.0.0",
     "keccak256": "^1.0.3",
     "lodash": "^4.17.21",
     "merkletreejs": "^0.2.24",
     "messages-decoder": "https://github.com/octopus-network/messages-decoder.git",
     "near-api-js": "^0.41.0",
+    "node-fetch": "^2.6.9",
     "snake-camel": "^1.0.8",
     "sqlite3": "^5.0.2",
     "sqlite3-upsert": "^1.0.0",
@@ -36,6 +40,8 @@
     "winston": "^3.3.3"
   },
   "devDependencies": {
+    "@types/isomorphic-fetch": "^0.0.36",
+    "@types/node-fetch": "^2.5.12",
     "ts-node": "^10.8.0",
     "ts-node-dev": "^2.0.0"
   }

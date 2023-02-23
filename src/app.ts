@@ -4,6 +4,7 @@ import { Account } from 'near-api-js'
 import {
   logJSON,
   toNumArray,
+  toBytes,
   WsProvider2,
   decodeV1SignedCommitment,
 } from './utils'
@@ -18,7 +19,7 @@ import {
   getLatestCommitmentBlockNumber,
 } from './nearCalls'
 import { initDb } from './db'
-import { MerkleProof, Session } from './interfaces'
+import { MerkleProof, MerkleProof2, Session } from './interfaces'
 import {
   getNextHeight,
   getLatestFinalizedHeight,
@@ -28,6 +29,7 @@ import {
 import {
   storeCommitment,
   handleCommitments,
+  setLatestBlockNumberUpdateState,
   getUnmarkedCommitments,
   setRelayMessagesLock,
   storeLightClientState,
@@ -44,6 +46,10 @@ import { confirmProcessingMessages } from './messages'
 import { isEqual } from 'lodash'
 import { appchainSetting, MINUTE, SECOND } from './constants'
 import util from 'util'
+import {newActor, getPublicKey, setIcpClient, updateState as updateStateForCanister, signMessages2} from './icp'
+import {initial_public_keys, state, header, mmr_leaf, mmr_proof, messages2} from './mock'
+import {_SERVICE as Service} from "./factory/idl.d";
+import { hexToNumberString } from 'web3-utils'
 
 const BLOCK_SYNC_SIZE = 20
 const BLOCK_LOG_SIZE = 100
@@ -63,12 +69,20 @@ async function start() {
     process.exit(1)
   }, MINUTE)
 
+  const actor = await newActor();
+  // await getPublicKey(actor);
+  await setIcpClient(actor, "test", initial_public_keys);
+
+  // // for test
+  // await updateStateForCanister(actor, new Uint8Array(state));
+  // await signMessages2(actor, new Uint8Array(messages2), new Uint8Array(header), new Uint8Array(mmr_leaf), new Uint8Array(mmr_proof));
+
   const appchain = await ApiPromise.create({
     provider: wsProvider,
   })
   if (appchain) {
     clearTimeout(exitTimer)
-    listening(appchain, account)
+    listening(appchain, account, actor)
     wsProvider.on('error', (error) =>
       console.log('provider', 'error', JSON.stringify(error))
     )
@@ -82,10 +96,10 @@ async function start() {
   }
 }
 
-async function listening(appchain: ApiPromise, account: Account) {
+async function listening(appchain: ApiPromise, account: Account, actor: Service) {
   console.log('start syncing')
-  syncBlocks(appchain)
-  handleCommitments(appchain)
+  syncBlocks(appchain, actor)
+  handleCommitments(appchain, actor)
   syncFinalizedHeights(appchain)
   confirmProcessingMessages()
   tryCompleteActions(account, appchain)
@@ -114,7 +128,7 @@ async function handleConnected(
 }
 
 let lastSyncBlocksLog = 0
-async function syncBlocks(appchain: ApiPromise) {
+async function syncBlocks(appchain: ApiPromise, actor: Service) {
   // set expired time for the whole async block
   const timer = setTimeout(async () => {
     console.error('syncBlocks expired')
@@ -142,6 +156,7 @@ async function syncBlocks(appchain: ApiPromise) {
     try {
       const nextHeight = await getNextHeight()
       const latestFinalizedHeight = getLatestFinalizedHeight()
+        console.log('syncBlocks nextHeight: %o, latestFinalizedHeight: %o', nextHeight, latestFinalizedHeight)
       if (nextHeight <= latestFinalizedHeight) {
         if (nextHeight - lastSyncBlocksLog >= BLOCK_LOG_SIZE) {
           console.log('nextHeight', nextHeight)
@@ -151,12 +166,12 @@ async function syncBlocks(appchain: ApiPromise) {
           const promises = new Array(BLOCK_SYNC_SIZE)
             .fill(1)
             .map(async (_, index) => {
-              await syncBlock(appchain, nextHeight + index)
+              await syncBlock(appchain, nextHeight + index, actor)
             })
           await Promise.all(promises)
           await updateSyncedBlock(nextHeight + BLOCK_SYNC_SIZE - 1)
         } else {
-          await syncBlock(appchain, nextHeight)
+          await syncBlock(appchain, nextHeight, actor)
           await updateSyncedBlock(nextHeight)
         }
       }
@@ -168,10 +183,10 @@ async function syncBlocks(appchain: ApiPromise) {
       }
     }
   }
-  setTimeout(() => syncBlocks(appchain), 6000)
+  setTimeout(() => syncBlocks(appchain, actor), 6000)
 }
 
-async function syncBlock(appchain: ApiPromise, nextHeight: number) {
+async function syncBlock(appchain: ApiPromise, nextHeight: number, actor: Service) {
   const latestFinalizedHeight = getLatestFinalizedHeight()
   if (nextHeight <= latestFinalizedHeight) {
     const nextBlockHash = await appchain.rpc.chain.getBlockHash(nextHeight)
@@ -201,38 +216,37 @@ async function syncBlock(appchain: ApiPromise, nextHeight: number) {
 
     let signedCommitmentHex: any
     if (justificationsHuman) {
-      ;(justificationsHuman as string[]).forEach((justificationHuman) => {
+      (justificationsHuman as string[]).forEach((justificationHuman) => {
         if (justificationHuman[0] === 'BEEF') {
           signedCommitmentHex = justificationHuman[1]
         }
       })
     }
     if (signedCommitmentHex) {
-      const session = await getLastNotCompletedSession()
-      await handleSignedCommitment(appchain, signedCommitmentHex, session)
+      await handleSignedCommitment(appchain, signedCommitmentHex, actor)
     }
   }
 }
 
+let UpdateStateCnt: number  = 0;
 async function handleSignedCommitment(
   appchain: ApiPromise,
   signedCommitmentHex: string,
-  session: Session
+  actor: Service
 ) {
-  const decodedSignedCommitment = decodeV1SignedCommitment(signedCommitmentHex)
-  const isWitnessMode = await checkAnchorIsWitnessMode()
-  if (isWitnessMode) {
-    return
+  if (UpdateStateCnt > 0 && UpdateStateCnt < 8) {
+    UpdateStateCnt += 1;
+    return 
   }
+
+  const decodedSignedCommitment = decodeV1SignedCommitment(signedCommitmentHex)
   const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber())
   const { blockNumber } = decodedSignedCommitment.commitment
 
   if (blockNumberInAnchor >= blockNumber) {
     return
   }
-  const isNewSession = session && blockNumber >= session.height
 
-  const unMarkedCommitments = await getUnmarkedCommitments(blockNumber)
   const currBlockHash = await appchain.rpc.chain.getBlockHash(blockNumber)
   const previousBlockHash = await appchain.rpc.chain.getBlockHash(
     blockNumber - 1
@@ -244,15 +258,6 @@ async function handleSignedCommitment(
     await appchain.query.beefy.authorities.at(previousBlockHash)
   ).toJSON()
   const isAuthoritiesEqual = isEqual(currentAuthorities, previousAuthorities)
-
-  if (unMarkedCommitments.length === 0 && !isNewSession) {
-    return
-  }
-
-  // if (inInterval) {
-  //   console.log("skip this justification. Reason: in interval");
-  //   return;
-  // }
 
   console.log(
     'decodedSignedCommitment',
@@ -271,8 +276,12 @@ async function handleSignedCommitment(
 
   console.log('blockNumber======', blockNumber.toNumber())
   logJSON('currBlockHash', currBlockHash)
-  const rawMmrProofWrapper = await appchain.rpc.mmr.generateBatchProof(
-    [Number(decodedSignedCommitment.commitment.blockNumber) - 1],
+  // const rawMmrProofWrapper  = await appchain.rpc.mmr.generateBatchProof(
+  //   [Number(decodedSignedCommitment.commitment.blockNumber) - 1],
+  //   currBlockHash
+  // )
+  const rawMmrProofWrapper  = await appchain.rpc.mmr.generateProof(
+    Number(decodedSignedCommitment.commitment.blockNumber) - 1,
     currBlockHash
   )
   logJSON('rawMmrProofWrapper', rawMmrProofWrapper.toJSON())
@@ -286,8 +295,7 @@ async function handleSignedCommitment(
     const proof: string[] = tree.getHexProof(leaf)
     console.log('proof', proof)
     const u8aProof = proof.map((hash) => toNumArray(hash))
-    const merkleProof: MerkleProof = {
-      root: toNumArray(root),
+    const merkleProof: MerkleProof2 = {
       proof: u8aProof,
       number_of_leaves: leaves.length,
       leaf_index: index,
@@ -302,6 +310,7 @@ async function handleSignedCommitment(
     mmr_leaf: toNumArray(rawMmrProofWrapper.leaf),
     mmr_proof: toNumArray(rawMmrProofWrapper.proof),
   }
+
   console.log(
     'lightClientState',
     util.inspect(lightClientState, {
@@ -311,26 +320,18 @@ async function handleSignedCommitment(
     })
   )
 
+  console.log('storeLightClientState', JSON.stringify(lightClientState))
+  console.log('storeLightClientState', toBytes(JSON.stringify(lightClientState)))
+
   const actionType = 'UpdateState'
   try {
-    if (isNewSession) {
-      if (await confirmAction(actionType)) {
-        console.log('done')
-        setRelayMessagesLock(true)
-        await updateState(lightClientState)
-        if (isNewSession) {
-          await sessionCompleted(session.height)
-        }
-        setRelayMessagesLock(false)
-        await storeAction(actionType)
-      }
-    } else {
-      storeLightClientState({ lightClientState, decodedSignedCommitment })
-    }
+    console.log('done')
+    setRelayMessagesLock(true)
+    await updateStateForCanister(actor, toBytes(JSON.stringify(lightClientState)))
+    setLatestBlockNumberUpdateState(Number(decodedSignedCommitment.commitment.blockNumber))
+
+    setRelayMessagesLock(false)
   } catch (err) {
-    if (isNewSession) {
-      await markFailedSession(session.height)
-    }
     setRelayMessagesLock(false)
     console.log(err)
   }

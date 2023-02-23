@@ -63,3 +63,12 @@ export function decodeV1SignedCommitment(hashString: string) {
   );
   return decodedSignedCommitment;
 }
+
+export function toBytes(text: string): Uint8Array {
+    const buffer = Buffer.from(text, 'utf8');
+    const result = Array(buffer.length);
+    for (let i = 0; i < buffer.length; ++i) {
+        result[i] = buffer[i];
+    }
+    return new Uint8Array(result);
+};

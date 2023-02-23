@@ -5,6 +5,7 @@ import {
   getLatestCommitmentBlockNumber,
   checkAnchorIsWitnessMode,
   relayMessages,
+  relayMessagesWithSignature,
 } from './nearCalls'
 import { getNextHeight, getLatestFinalizedHeight } from './blockHeights'
 import { dbRunAsync, dbAllAsync, dbGetAsync, upsertCommitments } from './db'
@@ -13,12 +14,15 @@ import { confirmProcessingMessages } from './messages'
 import {
   Commitment,
   MessageProof,
+  MessageWithSignature,
   MessageProofWithLightClientState,
 } from './interfaces'
 import { MmrLeafProof } from '@polkadot/types/interfaces'
 import { SECOND, MINUTE } from './constants'
 import decodeMessages from 'messages-decoder'
 import util from 'util'
+import {_SERVICE as Service} from "./factory/idl.d";
+import { signMessages} from './icp'
 
 let relayMessagesLock = false
 
@@ -26,7 +30,7 @@ export function setRelayMessagesLock(status: boolean) {
   relayMessagesLock = status
 }
 
-export async function handleCommitments(appchain: ApiPromise) {
+export async function handleCommitments(appchain: ApiPromise, actor: Service) {
   // set expired time for the whole async block
   const timer = setTimeout(async () => {
     console.error('handleCommitments expired')
@@ -58,7 +62,7 @@ export async function handleCommitments(appchain: ApiPromise) {
         // Use try-catch here instead of in handleCommitment for issuring the excecution order.
         for (let index = 0; index < unMarkedCommitments.length; index++) {
           // Excecute by order.
-          await handleCommitment(unMarkedCommitments[index], appchain)
+          await handleCommitment(unMarkedCommitments[index], appchain, actor)
         }
       }
       clearTimeout(timer)
@@ -69,7 +73,7 @@ export async function handleCommitments(appchain: ApiPromise) {
       }
     }
   }
-  setTimeout(() => handleCommitments(appchain), 6000)
+  setTimeout(() => handleCommitments(appchain, actor), 6000)
 }
 
 let lightClientStateWrapper: any = null
@@ -78,7 +82,12 @@ export function storeLightClientState(_lightClientStateWrapper: any) {
   lightClientStateWrapper = _lightClientStateWrapper
 }
 
-async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
+let latestCommitmentBlockNumber: any = null
+export function setLatestBlockNumberUpdateState(block_number: any) {
+  latestCommitmentBlockNumber = block_number
+}
+
+async function handleCommitment(commitment: Commitment, appchain: ApiPromise, actor: Service) {
   const latestFinalizedHeight = getLatestFinalizedHeight()
   if (commitment.height > latestFinalizedHeight) {
     return
@@ -88,78 +97,55 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
     appchain,
     commitment.commitment
   )
-  console.log('encoded_messages: ', encoded_messages)
-  const decoded_messages: any = decodeMessages(encoded_messages)
-  console.log(
-    'decoded_messages: ',
-    util.inspect(decoded_messages.toString(), {
-      showHidden: false,
-      depth: null,
-      colors: true,
-    })
-  )
+  // console.log('encoded_messages: ', encoded_messages)
+  // const decoded_messages: any = decodeMessages(encoded_messages)
+  // console.log(
+  //   'decoded_messages: ',
+  //   util.inspect(decoded_messages.toString(), {
+  //     showHidden: false,
+  //     depth: null,
+  //     colors: true,
+  //   })
+  // )
 
   let rawProof: MmrLeafProof | undefined = undefined
-  let messageProofWithState: MessageProofWithLightClientState | undefined =
-    undefined
-  let messageProofWithoutState: MessageProof | undefined = undefined
+  let messageProof: MessageProof | undefined = undefined
 
-  const isWitnessMode = await checkAnchorIsWitnessMode()
-  if (isWitnessMode) {
-    console.log(
-      'witnessMode ===== relay messages without proofs',
-      encoded_messages
-    )
-    messageProofWithoutState = messageProofWithoutProof(encoded_messages)
-  } else {
-    const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber())
-    if (
-      blockNumberInAnchor > latestFinalizedHeight ||
-      !lightClientStateWrapper ||
-      commitment.height >= blockNumberInAnchor
-    ) {
-      return
-    }
-
-    console.log('relay messages with proofs')
-    const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height)
-    const cHeader = await appchain.rpc.chain.getHeader(cBlockHash)
-    const blockHashInAnchor = await appchain.rpc.chain.getBlockHash(
-      blockNumberInAnchor
-    )
-    logJSON('blockHashInAnchor', blockHashInAnchor)
-    try {
-      const { lightClientState, decodedSignedCommitment } =
-        lightClientStateWrapper
-      const mmrRootBlockHash = await appchain.rpc.chain.getBlockHash(
-        decodedSignedCommitment.commitment.blockNumber
-      )
-      rawProof = await appchain.rpc.mmr.generateBatchProof(
-        [commitment.height],
-        mmrRootBlockHash
-      )
-      logJSON('rawProof', rawProof)
-      if (rawProof) {
-        messageProofWithState = {
-          signed_commitment: lightClientState.signed_commitment,
-          validator_proofs: lightClientState.validator_proofs,
-          mmr_leaf_for_mmr_root: lightClientState.mmr_leaf,
-          mmr_proof_for_mmr_root: lightClientState.mmr_proof,
-          encoded_messages: toNumArray(encoded_messages),
-          header: toNumArray(cHeader.toHex()),
-          mmr_leaf_for_header: toNumArray(rawProof.leaf),
-          mmr_proof_for_header: toNumArray(rawProof.proof),
-        }
-      } else {
-        messageProofWithoutState = messageProofWithoutProof(encoded_messages)
-      }
-    } catch (error) {
-      console.log('generateProof error', error)
-      messageProofWithoutState = messageProofWithoutProof(encoded_messages)
-    }
+  if (
+    latestCommitmentBlockNumber > latestFinalizedHeight ||
+    commitment.height >= latestCommitmentBlockNumber 
+  ) {
+    console.log("latestCommitmentBlockNumber : ", latestCommitmentBlockNumber)
+    console.log("latestFinalizedHeight: ", latestFinalizedHeight)
+    console.log("commitment.height: ", commitment.height)
+    return
   }
 
-  if (messageProofWithState || messageProofWithoutState) {
+  console.log('relay messages with proofs')
+  const cBlockHash = await appchain.rpc.chain.getBlockHash(commitment.height)
+  const cHeader = await appchain.rpc.chain.getHeader(cBlockHash)
+  try {
+    const mmrRootBlockHash = await appchain.rpc.chain.getBlockHash(
+      latestCommitmentBlockNumber
+    )
+
+    rawProof = await appchain.rpc.mmr.generateProof(
+      commitment.height,
+      mmrRootBlockHash
+    )
+    logJSON('rawProof', rawProof)
+    messageProof = {
+      encoded_messages: toNumArray(encoded_messages),
+      header: toNumArray(cHeader.toHex()),
+      mmr_leaf: toNumArray(rawProof.leaf),
+      mmr_proof: toNumArray(rawProof.proof),
+    }
+
+  } catch (error) {
+    console.log('generateProof error', error)
+  }
+
+  if (messageProof) {
     let txId: string = ''
     let failedCall: any = null
     try {
@@ -169,16 +155,17 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
         console.log('inStateCompleting', inStateCompleting)
       }
 
-      if (relayMessagesLock || (inStateCompleting && !isWitnessMode)) {
+      if (relayMessagesLock) {
         return
       }
 
-      let callResult: any
-      if (messageProofWithState) {
-        callResult = await relayMessagesWithAllProofs(messageProofWithState)
-      } else if (messageProofWithoutState) {
-        callResult = await relayMessages(messageProofWithoutState)
+      let sig = await signMessages(actor, messageProof)
+      let messageWithSignature = {
+        encoded_messages: messageProof.encoded_messages,
+        verification_proxy_signature: sig,
       }
+      let callResult: any = await relayMessagesWithSignature(messageWithSignature)
+
       if (callResult.transaction_outcome) {
         txId = callResult.transaction_outcome.id
       }
@@ -194,14 +181,6 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise) {
 
     if (failedCall) {
       await markAsSent(commitment.commitment, 2, txId)
-      const latestIsWitnessMode = await checkAnchorIsWitnessMode()
-      if (isWitnessMode && !latestIsWitnessMode) {
-        console.log(
-          're-handle commitment for witnessMode switching',
-          commitment
-        )
-        await handleCommitment(commitment, appchain)
-      }
     } else {
       await markAsSent(commitment.commitment, 1, txId)
       await confirmProcessingMessages()
