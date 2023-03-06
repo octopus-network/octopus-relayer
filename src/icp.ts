@@ -10,7 +10,7 @@ import {
 
 // local
 const host = "http://127.0.0.1:4943";
-const canisterId = "223du-7qaaa-aaaaa-aab4q-cai";
+const canisterId = "2g7zf-iqaaa-aaaaa-aab6q-cai";
 
 // mainnet
 // const host = "https://ic0.app";    
@@ -47,6 +47,11 @@ export async function setIcpClient(actor: Service, chainId: string, initialPubli
     console.log("after set client: ", ret);
 }
 
+export async function forceSetIcpClient(actor: Service, chainId: string, initialPublicKeys: string []) {
+    const ret = await actor.force_set_client(chainId, initialPublicKeys);
+    console.log("after force set client: ", ret);
+}
+
 export async function updateState(actor: Service, state: Uint8Array) {
     console.log("before update state, data: %o", state);
     const ret = await actor.update_state(state);
@@ -60,22 +65,11 @@ export async function getPublicKey(actor: Service): Promise<number[]> {
 }
 
 export async function signMessages(actor: Service, swp: MessageProof): Promise<number[]> {
-    const result = await actor.sign_messages2(
+    const result = await actor.sign_messages(
       new Uint8Array(swp.encoded_messages), 
       new Uint8Array(swp.header), 
       new Uint8Array(swp.mmr_leaf), 
       new Uint8Array(swp.mmr_proof));
-
-    console.log("signature is: ", result);
-    return (result as any).Ok;
-}
-
-export async function signMessages2(actor: Service, messages: Uint8Array, header: Uint8Array, mmrLeaf: Uint8Array, mmrProof: Uint8Array): Promise<number[]> {
-    const result = await actor.sign_messages2(
-      messages, 
-      header, 
-      mmrLeaf, 
-      mmrProof);
 
     console.log("signature is: ", result);
     return (result as any).Ok;

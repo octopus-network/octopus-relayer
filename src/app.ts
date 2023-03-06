@@ -46,10 +46,9 @@ import { confirmProcessingMessages } from './messages'
 import { isEqual } from 'lodash'
 import { appchainSetting, MINUTE, SECOND } from './constants'
 import util from 'util'
-import {newActor, getPublicKey, setIcpClient, updateState as updateStateForCanister, signMessages2} from './icp'
-import {initial_public_keys, state, header, mmr_leaf, mmr_proof, messages2} from './mock'
+import {newActor, setIcpClient, updateState as updateStateForCanister} from './icp'
+import {initial_public_keys} from './mock'
 import {_SERVICE as Service} from "./factory/idl.d";
-import { hexToNumberString } from 'web3-utils'
 
 const BLOCK_SYNC_SIZE = 20
 const BLOCK_LOG_SIZE = 100
@@ -70,12 +69,7 @@ async function start() {
   }, MINUTE)
 
   const actor = await newActor();
-  // await getPublicKey(actor);
   await setIcpClient(actor, "test", initial_public_keys);
-
-  // // for test
-  // await updateStateForCanister(actor, new Uint8Array(state));
-  // await signMessages2(actor, new Uint8Array(messages2), new Uint8Array(header), new Uint8Array(mmr_leaf), new Uint8Array(mmr_proof));
 
   const appchain = await ApiPromise.create({
     provider: wsProvider,
