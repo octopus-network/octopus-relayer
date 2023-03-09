@@ -68,43 +68,6 @@ export async function relayMessagesWithSignature(args: MessageWithSignature) {
   })
 }
 
-export async function relayMessagesWithAllProofs(
-  args: MessageProofWithLightClientState
-) {
-  console.log('relayMessagesWithAllProofs-----------------------')
-  console.log('\x1b[34m%s\x1b[0m', JSON.stringify(args))
-  console.log('------------------------------------')
-  return await account.functionCall({
-    contractId: anchorContractId as string,
-    methodName: 'process_appchain_messages_with_all_proofs',
-    args,
-    gas: DEFAULT_GAS,
-    attachedDeposit: new BN('0'),
-  })
-}
-
-export async function updateState(args: LightClientState) {
-  console.log('updateState========================')
-  console.log('\x1b[32m%s\x1b[0m', JSON.stringify(args))
-  console.log('===================================')
-  return await account.functionCall({
-    contractId: anchorContractId as string,
-    methodName: 'start_updating_state_of_beefy_light_client',
-    args,
-    gas: DEFAULT_GAS,
-    attachedDeposit: new BN('0'),
-  })
-}
-
-export async function getLatestCommitmentBlockNumber() {
-  const latest_commitment = await account.viewFunction(
-    anchorContractId as string,
-    'get_latest_commitment_of_appchain',
-    {}
-  )
-  return latest_commitment ? latest_commitment.block_number : 0
-}
-
 export async function processAppchainMessages() {
   const result: any = await account.functionCall({
     contractId: anchorContractId as string,

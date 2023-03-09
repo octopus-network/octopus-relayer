@@ -1,10 +1,6 @@
 import { ApiPromise } from '@polkadot/api'
 import { logJSON, toNumArray } from './utils'
 import {
-  relayMessagesWithAllProofs,
-  getLatestCommitmentBlockNumber,
-  checkAnchorIsWitnessMode,
-  relayMessages,
   relayMessagesWithSignature,
 } from './nearCalls'
 import { getNextHeight, getLatestFinalizedHeight } from './blockHeights'
@@ -15,77 +11,70 @@ import {
   Commitment,
   MessageProof,
   MessageWithSignature,
-  MessageProofWithLightClientState,
 } from './interfaces'
 import { MmrLeafProof } from '@polkadot/types/interfaces'
 import { SECOND, MINUTE } from './constants'
 import decodeMessages from 'messages-decoder'
 import util from 'util'
 import {_SERVICE as Service} from "./factory/idl.d";
-import { signMessages} from './icp'
+import { signMessages, updateState as updateStateForCanister} from './icp'
 
 let relayMessagesLock = false
-
 export function setRelayMessagesLock(status: boolean) {
   relayMessagesLock = status
 }
 
-export async function handleCommitments(appchain: ApiPromise, actor: Service) {
-  // set expired time for the whole async block
-  const timer = setTimeout(async () => {
-    console.error('handleCommitments expired')
-
-    // test connection
-    const exitTimer = setTimeout(() => {
-      console.error('test connection: always pending')
-      process.exit(1)
-    }, 10 * SECOND)
-    try {
-      const finalizedHead = await appchain.rpc.chain.getFinalizedHead()
-      if (finalizedHead) {
-        console.log('test connection: Ok')
-        console.log('finalizedHead', finalizedHead.toHuman())
-        return clearTimeout(exitTimer)
-      }
-    } catch (e) {
-      console.error('test connection: fail', e)
-    }
-    process.exit(-1)
-  }, 2 * MINUTE)
+export async function updateStateAndHandleCommitments(appchain: ApiPromise, actor: Service, state: Uint8Array, blockNumber: number) {
   if (appchain.isConnected) {
     try {
       const nextHeight = await getNextHeight()
       const currentHeight = nextHeight - 1
       const unMarkedCommitments = await getUnmarkedCommitments(currentHeight)
       if (unMarkedCommitments.length > 0) {
+        await updateState(actor, state, blockNumber)
+        console.log('unMarkedCommitments.length: ', unMarkedCommitments.length)
+
         unMarkedCommitments
         // Use try-catch here instead of in handleCommitment for issuring the excecution order.
         for (let index = 0; index < unMarkedCommitments.length; index++) {
           // Excecute by order.
           await handleCommitment(unMarkedCommitments[index], appchain, actor)
         }
+      } else {
+        if ((latestUpdateStateTime == null) || ((Date.now() - latestUpdateStateTime) >= 4 * 60 * 60 * 1000)) {
+          console.log('data.now', Date.now())
+          console.log('latestSetTime', latestUpdateStateTime)
+          await updateState(actor, state, blockNumber)
+        }
+
       }
-      clearTimeout(timer)
     } catch (e: any) {
       console.error('commitments handling failed', e)
-      if (!/disconnected/.test(e.toString())) {
-        clearTimeout(timer)
-      }
     }
   }
-  setTimeout(() => handleCommitments(appchain, actor), 6000)
 }
 
-let lightClientStateWrapper: any = null
-export function storeLightClientState(_lightClientStateWrapper: any) {
-  console.log('storeLightClientState', JSON.stringify(_lightClientStateWrapper))
-  lightClientStateWrapper = _lightClientStateWrapper
+let latestUpdateStateBlockNumber: any = null
+function setLatestUpdateStateBlockNumber(block_number: any) {
+  latestUpdateStateBlockNumber = block_number
 }
 
-let latestCommitmentBlockNumber: any = null
-export function setLatestBlockNumberUpdateState(block_number: any) {
-  latestCommitmentBlockNumber = block_number
+export function getLatestUpdateStateBlockNumber(): number {
+  return latestUpdateStateBlockNumber
 }
+
+
+let latestUpdateStateTime: any = null
+function setlatestUpdateStateTime() {
+  latestUpdateStateTime = Date.now();
+}
+
+async function updateState(actor: Service, state: Uint8Array, blockNumber: number) {
+  await updateStateForCanister(actor, state)
+  setLatestUpdateStateBlockNumber(blockNumber)
+  setlatestUpdateStateTime()  
+}
+
 
 async function handleCommitment(commitment: Commitment, appchain: ApiPromise, actor: Service) {
   const latestFinalizedHeight = getLatestFinalizedHeight()
@@ -112,10 +101,10 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise, ac
   let messageProof: MessageProof | undefined = undefined
 
   if (
-    latestCommitmentBlockNumber > latestFinalizedHeight ||
-    commitment.height >= latestCommitmentBlockNumber 
+    latestUpdateStateBlockNumber > latestFinalizedHeight ||
+    commitment.height >= latestUpdateStateBlockNumber 
   ) {
-    console.log("latestCommitmentBlockNumber : ", latestCommitmentBlockNumber)
+    console.log("latestUpdateStateBlockNumber : ", latestUpdateStateBlockNumber)
     console.log("latestFinalizedHeight: ", latestFinalizedHeight)
     console.log("commitment.height: ", commitment.height)
     return
@@ -126,7 +115,7 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise, ac
   const cHeader = await appchain.rpc.chain.getHeader(cBlockHash)
   try {
     const mmrRootBlockHash = await appchain.rpc.chain.getBlockHash(
-      latestCommitmentBlockNumber
+      latestUpdateStateBlockNumber
     )
 
     rawProof = await appchain.rpc.mmr.generateProof(
@@ -160,9 +149,11 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise, ac
       }
 
       let sig = await signMessages(actor, messageProof)
+      let sigInArray = Array.from(sig)
+      console.log('sig:', sigInArray)
       let messageWithSignature = {
         encoded_messages: messageProof.encoded_messages,
-        verification_proxy_signature: sig,
+        verification_proxy_signature: sigInArray,
       }
       let callResult: any = await relayMessagesWithSignature(messageWithSignature)
 
@@ -185,15 +176,6 @@ async function handleCommitment(commitment: Commitment, appchain: ApiPromise, ac
       await markAsSent(commitment.commitment, 1, txId)
       await confirmProcessingMessages()
     }
-  }
-}
-
-function messageProofWithoutProof(encoded_messages: string): MessageProof {
-  return {
-    encoded_messages: toNumArray(encoded_messages),
-    header: [],
-    mmr_leaf: [],
-    mmr_proof: [],
   }
 }
 

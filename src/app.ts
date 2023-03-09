@@ -12,12 +12,7 @@ import keccak256 from 'keccak256'
 // @ts-ignore
 import publicKeyToAddress from 'ethereum-public-key-to-address'
 import MerkleTree from 'merkletreejs'
-import {
-  initNearRpc,
-  updateState,
-  checkAnchorIsWitnessMode,
-  getLatestCommitmentBlockNumber,
-} from './nearCalls'
+import { initNearRpc } from './nearCalls'
 import { initDb } from './db'
 import { MerkleProof, MerkleProof2, Session } from './interfaces'
 import {
@@ -28,11 +23,8 @@ import {
 } from './blockHeights'
 import {
   storeCommitment,
-  handleCommitments,
-  setLatestBlockNumberUpdateState,
-  getUnmarkedCommitments,
-  setRelayMessagesLock,
-  storeLightClientState,
+  getLatestUpdateStateBlockNumber,
+  updateStateAndHandleCommitments,
 } from './commitments'
 import { storeAction, confirmAction, tryCompleteActions } from './actions'
 import {
@@ -46,9 +38,9 @@ import { confirmProcessingMessages } from './messages'
 import { isEqual } from 'lodash'
 import { appchainSetting, MINUTE, SECOND } from './constants'
 import util from 'util'
-import {newActor, setIcpClient, updateState as updateStateForCanister} from './icp'
-import {initial_public_keys} from './mock'
-import {_SERVICE as Service} from "./factory/idl.d";
+import { newActor, setIcpClient, getPublicKey, forceSetIcpClient, updateState as updateStateForCanister } from './icp'
+import { initial_public_keys } from './mock'
+import { _SERVICE as Service } from "./factory/idl.d";
 
 const BLOCK_SYNC_SIZE = 20
 const BLOCK_LOG_SIZE = 100
@@ -70,6 +62,11 @@ async function start() {
 
   const actor = await newActor();
   await setIcpClient(actor, "test", initial_public_keys);
+  // await forceSetIcpClient(actor, "test", initial_public_keys);
+
+  let publickey = await getPublicKey(actor);
+  // let public_key = new Uint8Array(Buffer.from(publickey, "hex"));
+  console.log("Icp canister publickey is: ", publickey)
 
   const appchain = await ApiPromise.create({
     provider: wsProvider,
@@ -93,7 +90,6 @@ async function start() {
 async function listening(appchain: ApiPromise, account: Account, actor: Service) {
   console.log('start syncing')
   syncBlocks(appchain, actor)
-  handleCommitments(appchain, actor)
   syncFinalizedHeights(appchain)
   confirmProcessingMessages()
   tryCompleteActions(account, appchain)
@@ -150,7 +146,7 @@ async function syncBlocks(appchain: ApiPromise, actor: Service) {
     try {
       const nextHeight = await getNextHeight()
       const latestFinalizedHeight = getLatestFinalizedHeight()
-        console.log('syncBlocks nextHeight: %o, latestFinalizedHeight: %o', nextHeight, latestFinalizedHeight)
+      console.log('syncBlocks nextHeight: %o, latestFinalizedHeight: %o', nextHeight, latestFinalizedHeight)
       if (nextHeight <= latestFinalizedHeight) {
         if (nextHeight - lastSyncBlocksLog >= BLOCK_LOG_SIZE) {
           console.log('nextHeight', nextHeight)
@@ -222,22 +218,16 @@ async function syncBlock(appchain: ApiPromise, nextHeight: number, actor: Servic
   }
 }
 
-let UpdateStateCnt: number  = 0;
 async function handleSignedCommitment(
   appchain: ApiPromise,
   signedCommitmentHex: string,
   actor: Service
 ) {
-  if (UpdateStateCnt > 0 && UpdateStateCnt < 8) {
-    UpdateStateCnt += 1;
-    return 
-  }
-
   const decodedSignedCommitment = decodeV1SignedCommitment(signedCommitmentHex)
-  const blockNumberInAnchor = Number(await getLatestCommitmentBlockNumber())
+  const latestUpdateStateBlockNumber = getLatestUpdateStateBlockNumber()
   const { blockNumber } = decodedSignedCommitment.commitment
 
-  if (blockNumberInAnchor >= blockNumber) {
+  if (latestUpdateStateBlockNumber >= blockNumber) {
     return
   }
 
@@ -270,11 +260,8 @@ async function handleSignedCommitment(
 
   console.log('blockNumber======', blockNumber.toNumber())
   logJSON('currBlockHash', currBlockHash)
-  // const rawMmrProofWrapper  = await appchain.rpc.mmr.generateBatchProof(
-  //   [Number(decodedSignedCommitment.commitment.blockNumber) - 1],
-  //   currBlockHash
-  // )
-  const rawMmrProofWrapper  = await appchain.rpc.mmr.generateProof(
+
+  const rawMmrProofWrapper = await appchain.rpc.mmr.generateProof(
     Number(decodedSignedCommitment.commitment.blockNumber) - 1,
     currBlockHash
   )
@@ -314,21 +301,11 @@ async function handleSignedCommitment(
     })
   )
 
-  console.log('storeLightClientState', JSON.stringify(lightClientState))
-  console.log('storeLightClientState', toBytes(JSON.stringify(lightClientState)))
-
-  const actionType = 'UpdateState'
-  try {
-    console.log('done')
-    setRelayMessagesLock(true)
-    await updateStateForCanister(actor, toBytes(JSON.stringify(lightClientState)))
-    setLatestBlockNumberUpdateState(Number(decodedSignedCommitment.commitment.blockNumber))
-
-    setRelayMessagesLock(false)
-  } catch (err) {
-    setRelayMessagesLock(false)
-    console.log(err)
-  }
+  // console.log('storeLightClientState', JSON.stringify(lightClientState))
+  // console.log('storeLightClientState', toBytes(JSON.stringify(lightClientState)))
+  await updateStateAndHandleCommitments(appchain, actor, 
+    toBytes(JSON.stringify(lightClientState)), 
+    Number(decodedSignedCommitment.commitment.blockNumber))
 }
 
 start().catch((error) => {

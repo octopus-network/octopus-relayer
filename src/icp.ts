@@ -10,7 +10,7 @@ import {
 
 // local
 const host = "http://127.0.0.1:4943";
-const canisterId = "2g7zf-iqaaa-aaaaa-aab6q-cai";
+const canisterId = "rrkah-fqaaa-aaaaa-aaaaq-cai";
 
 // mainnet
 // const host = "https://ic0.app";    

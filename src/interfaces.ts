@@ -87,5 +87,5 @@ export interface LightClientState {
 
 export interface MessageWithSignature {
   encoded_messages: number[];
-  verification_proxy_signature: number[];
+  verification_proxy_signature: number[] | null ;
 }
