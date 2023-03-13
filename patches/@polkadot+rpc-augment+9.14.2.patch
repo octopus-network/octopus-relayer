@@ -1,5 +1,5 @@
 diff --git a/node_modules/@polkadot/rpc-augment/augment/jsonrpc.d.ts b/node_modules/@polkadot/rpc-augment/augment/jsonrpc.d.ts
-index 588d778..3cc2aea 100644
+index 588d778..55a10f9 100644
 --- a/node_modules/@polkadot/rpc-augment/augment/jsonrpc.d.ts
 +++ b/node_modules/@polkadot/rpc-augment/augment/jsonrpc.d.ts
 @@ -429,11 +429,11 @@ declare module '@polkadot/rpc-core/types/jsonrpc' {
@@ -7,7 +7,7 @@ index 588d778..3cc2aea 100644
               * Generate MMR proof for the given leaf indices.
               **/
 -            generateBatchProof: AugmentedRpc<(leafIndices: Vec<u64> | (u64 | AnyNumber | Uint8Array)[], at?: BlockHash | string | Uint8Array) => Observable<MmrLeafProof>>;
-+            generateBatchProof: AugmentedRpc<(leafIndices: Vec<u64> | (u64 | AnyNumber | Uint8Array)[], at?: BlockHash | string | Uint8Array) => Observable<MmrLeafiBatchProof>>;
++            generateBatchProof: AugmentedRpc<(leafIndices: Vec<u64> | (u64 | AnyNumber | Uint8Array)[], at?: BlockHash | string | Uint8Array) => Observable<MmrLeafBatchProof>>;
              /**
               * Generate MMR proof for given leaf index.
               **/
