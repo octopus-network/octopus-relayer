@@ -315,10 +315,17 @@ export const mmr_proof = [
         204, 133, 188, 159, 28, 73, 170, 87,
     ];
 
-export const initial_public_keys = [
-        "0x020a1091341fe5664bfa1782d5e04779689068c916b04cb365ec3153755684d9a1", // Alice
-        "0x0390084fdbf27d2b79d26a4f13f0ccd982cb755a661969143c37cbc49ef5b91f27", // Bob
-        // "0x0389411795514af1627765eceffcbd002719f031604fadd7d188e2dc585b4e1afb", // Charlie
-        // "0x03bc9d0ca094bd5b8b3225d7651eac5d18c1c04bf8ae8f8b263eebca4e1410ed0c", // Dave
-        // "0x031d10105e323c4afce225208f71a6441ee327a65b9e646e772500c74d31f669aa", // Eve
-    ];
+// export const initial_public_keys = [
+//         "0x020a1091341fe5664bfa1782d5e04779689068c916b04cb365ec3153755684d9a1", // Alice
+//         "0x0390084fdbf27d2b79d26a4f13f0ccd982cb755a661969143c37cbc49ef5b91f27", // Bob
+//         // "0x0389411795514af1627765eceffcbd002719f031604fadd7d188e2dc585b4e1afb", // Charlie
+//         // "0x03bc9d0ca094bd5b8b3225d7651eac5d18c1c04bf8ae8f8b263eebca4e1410ed0c", // Dave
+//         // "0x031d10105e323c4afce225208f71a6441ee327a65b9e646e772500c74d31f669aa", // Eve
+//     ];
+
+export const initial_public_keys =  [
+    // "0x0329a845da6531bc089b0e92baa52fa976dcd496337f25b03924898ffb6bcbe604",
+    "0x0338a1d90b056fd6290fa080f296277b128ab0c002efe88802665cf74d15865745",
+    "0x0320a6555b0846cdf352b4abb5dec4879c4d2379630213908603b758a88d5ef9f8",
+    "0x025ac06ac3658a0ec3c82599a98435293139c294fae3476ea01dccef8efe77a9b0",
+];
