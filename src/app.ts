@@ -61,8 +61,8 @@ async function start() {
   }, MINUTE)
 
   const actor = await newActor();
-  // await setIcpClient(actor, "test", initial_public_keys);
-  await forceSetIcpClient(actor, "test", initial_public_keys);
+  await setIcpClient(actor, "test", initial_public_keys);
+  // await forceSetIcpClient(actor, "test", initial_public_keys);
 
   let publickey = await getPublicKey(actor);
   // let public_key = new Uint8Array(Buffer.from(publickey, "hex"));
@@ -103,7 +103,11 @@ async function handleDisconnected(provider: WsProvider, appchain: ApiPromise) {
       console.log('timeout for reconnection')
       process.exit(-1)
     }
-  }, 20 * MINUTE)
+  }, 20 * MINUTE
+    
+    
+    ,
+)
 }
 
 async function handleConnected(
