@@ -1,6 +1,6 @@
 # Use the official lightweight Node.js 16 image.
 # https://hub.docker.com/_/node
-FROM node:16-slim
+FROM node:18.13
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
