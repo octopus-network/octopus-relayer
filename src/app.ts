@@ -61,8 +61,8 @@ async function start() {
   }, MINUTE)
 
   const actor = await newActor();
-  await setIcpClient(actor, "test", initial_public_keys);
-  // await forceSetIcpClient(actor, "test", initial_public_keys);
+  //await setIcpClient(actor, "test", initial_public_keys);
+  await forceSetIcpClient(actor, "test", initial_public_keys);
 
   let publickey = await getPublicKey(actor);
   // let public_key = new Uint8Array(Buffer.from(publickey, "hex"));
