@@ -143,14 +143,12 @@ async function handleCommitment(
 
   let rawProof: MmrLeafProof | undefined = undefined;
   let messageProof: MessageProof | undefined = undefined;
-  let messageProofWithoutState: MessageProof | undefined = undefined;
 
   if (isWitnessMode) {
     console.log(
       "witnessMode ===== relay messages without proofs",
       encoded_messages
     );
-    messageProofWithoutState = messageProofWithoutProof(encoded_messages);
   } else {
     if (
       latestUpdateStateBlockNumber > latestFinalizedHeight ||
@@ -189,7 +187,7 @@ async function handleCommitment(
     }
   }
 
-  if (messageProof || messageProofWithoutState) {
+  if (messageProof || isWitnessMode) {
     let txId: string = "";
     let failedCall: any = null;
     try {
@@ -203,21 +201,23 @@ async function handleCommitment(
         return;
       }
 
-      let callResult: any;
+      let messageWithSignature: any;
       if (messageProof) {
         let sig = await signMessages(actor, messageProof);
         let sigInArray = Array.from(sig);
         console.log("sig:", sigInArray);
-        let messageWithSignature = {
-          encoded_messages: messageProof.encoded_messages,
+        messageWithSignature = {
+          encoded_messages: toNumArray(encoded_messages),
           verification_proxy_signature: sigInArray,
         };
-        callResult = await relayMessagesWithSignature(messageWithSignature);
-      } else if (messageProofWithoutState) {
+      } else if (isWitnessMode) {
         console.log("witnessMode ===== will relay messages");
-        messageProofWithoutState = messageProofWithoutProof(encoded_messages);
-        callResult = await relayMessages(messageProofWithoutState);
+        messageWithSignature = {
+          encoded_messages: toNumArray(encoded_messages),
+          verification_proxy_signature: null,
+        };
       }
+      let callResult = await relayMessagesWithSignature(messageWithSignature);
 
       if (callResult.transaction_outcome) {
         txId = callResult.transaction_outcome.id;
@@ -239,15 +239,6 @@ async function handleCommitment(
       await confirmProcessingMessages();
     }
   }
-}
-
-function messageProofWithoutProof(encoded_messages: string): MessageProof {
-  return {
-    encoded_messages: toNumArray(encoded_messages),
-    header: [],
-    mmr_leaf: [],
-    mmr_proof: [],
-  };
 }
 
 async function markAsSent(commitment: string, status: number, txId: string) {

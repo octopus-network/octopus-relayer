@@ -92,7 +92,7 @@ export async function checkAnchorIsWitnessMode() {
   try {
     const anchorSettings = await getAnchorSettings();
     return anchorSettings
-      ? anchorSettings.beefy_light_client_witness_mode
+      ? anchorSettings.witness_mode
       : false;
   } catch (error) {
     console.error("checkAnchorIsWitnessMode error", error);

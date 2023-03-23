@@ -223,17 +223,14 @@ async function syncBlock(
       await storeSession(nextHeight);
     }
 
-    // const isWitnessMode = await checkAnchorIsWitnessMode();
-    const isWitnessMode = true;
+    const isWitnessMode = await checkAnchorIsWitnessMode();
     if (isWitnessMode) {
-      console.log("Is witnessmode +++++++++++++++++++++++++ ");
       await directHandleCommitments(appchain, actor);
     } else {
       let signedCommitmentHex: any;
       if (justificationsHuman) {
         (justificationsHuman as string[]).forEach((justificationHuman) => {
           if (justificationHuman[0] === "BEEF") {
-            console.log("get beefy +++++++++++++++++++++++++ ");
             signedCommitmentHex = justificationHuman[1];
           }
         });
