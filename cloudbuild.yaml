@@ -1,5 +1,5 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME:0.9.30-3.0.0-version0.1.0', '.' ]
+  args: [ 'build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME:0.9.30-3.0.0-version0.2.0', '.' ]
 images:
-- 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME:0.9.30-3.0.0-version0.1.0'
+- 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME:0.9.30-3.0.0-version0.2.0'
