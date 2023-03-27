@@ -2,41 +2,23 @@
   "name": "octopus-relayer",
   "version": "1.0.0",
   "description": "",
-  "main": "app.js",
+  "main": "index.js",
   "scripts": {
-    "dev": "ts-node-dev ./src/app.ts",
-    "migrate-up": "node node_modules/db-migrate/bin/db-migrate up -c 1",
-    "migrate-down": "node node_modules/db-migrate/bin/db-migrate down -c 1",
-    "print": "ts-node-dev ./src/printMessages.ts",
-    "build": "tsc -p .",
-    "buildRun": "tsc & node ./dist/app.js",
-    "start": "node ./dist/app.js"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc --build",
+    "clean": "tsc --build --clean",
+    "dev": "ts-node src/index.ts"
   },
   "keywords": [],
-  "author": "",
+  "author": "Julian Sun",
   "license": "ISC",
-  "dependencies": {
-    "@polkadot/api": "9.6.2",
-    "@polkadot/types": "9.6.2",
-    "chalk": "^4.1.1",
-    "db-migrate": "^0.11.13",
-    "db-migrate-sqlite3": "^0.4.0",
-    "dotenv": "^10.0.0",
-    "ethereum-public-key-to-address": "^0.0.5",
-    "keccak256": "^1.0.3",
-    "lodash": "^4.17.21",
-    "merkletreejs": "^0.2.24",
-    "messages-decoder": "https://github.com/octopus-network/messages-decoder.git",
-    "near-api-js": "^0.41.0",
-    "snake-camel": "^1.0.8",
-    "sqlite3": "^5.0.2",
-    "sqlite3-upsert": "^1.0.0",
-    "typescript": "^4.3.2",
-    "web3-utils": "^1.6.0",
-    "winston": "^3.3.3"
-  },
   "devDependencies": {
-    "ts-node": "^10.8.0",
-    "ts-node-dev": "^2.0.0"
+    "prettier": "^2.8.7",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.2"
+  },
+  "dependencies": {
+    "@google-cloud/pubsub": "^3.4.1",
+    "@polkadot/api": "^10.2.1"
   }
 }
