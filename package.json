@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@google-cloud/pubsub": "^3.4.1",
-    "@polkadot/api": "^10.2.1"
+    "@polkadot/api": "^10.2.1",
+    "@polkadot/util-crypto": "^11.1.2",
+    "merkletreejs": "^0.3.9"
   }
 }

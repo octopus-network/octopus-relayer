@@ -1,13 +1,8 @@
 // Imports the Google Cloud client library
 import { PubSub } from "@google-cloud/pubsub";
 
-// const credentials = JSON.parse();
-
 // Creates a client; cache this for further use
-const pubSubClient = new PubSub({
-  projectId: "octopus-dev-309403",
-  // credentials,
-});
+const pubSubClient = new PubSub();
 
 export async function publishMessage(topicNameOrId: string, data: string) {
   // Publishes the message as a string, e.g. "Hello, world!" or JSON.stringify(someObject)
