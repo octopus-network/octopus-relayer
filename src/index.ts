@@ -1,9 +1,14 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
-import { publishMessage } from "./pubsub";
+import { publishMessage, synchronousPull } from "./pubsub";
 
 import { merkleProof } from "./merkletree";
 
-const topicNameOrId = "projects/octopus-dev-309403/topics/test-appchain";
+const topicVersionedFinalityProof =
+  "projects/octopus-dev-309403/topics/test-appchain-versioned-finality-proof";
+const topicMessage = "projects/octopus-dev-309403/topics/test-appchain-message";
+const projectId = "octopus-dev-309403";
+const subscriptionMessage =
+  "projects/octopus-dev-309403/subscriptions/test-appchain-message-sub";
 
 async function main() {
   const wsProvider = new WsProvider("ws://127.0.0.1:9944");
@@ -63,8 +68,11 @@ async function main() {
     if (JSON.stringify(authorities) !== JSON.stringify(nextAuthorities)) {
       // TODO
     }
+
+    await synchronousPull(projectId, subscriptionMessage);
+
     await publishMessage(
-      topicNameOrId,
+      topicVersionedFinalityProof,
       JSON.stringify({
         beefySignedCommitment: beefySignedCommitment,
         authoritySetProof: authoritySetProof,
@@ -74,4 +82,34 @@ async function main() {
   });
 }
 
-main().then(() => console.log("completed"));
+async function main1() {
+  const wsProvider = new WsProvider(
+    "wss://gateway.testnet.octopus.network/myriad/8f543a1c219f14d83c0faedefdd5be6e"
+  );
+  const api = await ApiPromise.create({
+    provider: wsProvider,
+  });
+  const unsubscribe = await api.rpc.chain.subscribeFinalizedHeads((header) => {
+    header.digest.logs.forEach(async (log) => {
+      if (log.isOther) {
+        const commitmentHash = log.asOther.toString();
+        const crossChainMessages = await api.rpc.offchain.localStorageGet(
+          "PERSISTENT",
+          commitmentHash
+        );
+        console.log(`crossChainMessages: ${crossChainMessages}`);
+        await publishMessage(
+          topicMessage,
+          JSON.stringify({
+            blockNumber: header.number.toNumber(),
+            commitmentHash: commitmentHash,
+            crossChainMessages: crossChainMessages,
+            header: header.toHex(),
+          })
+        );
+      }
+    });
+  });
+}
+
+main().catch(console.error);

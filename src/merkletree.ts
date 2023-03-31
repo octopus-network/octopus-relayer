@@ -15,16 +15,17 @@ export interface MerkleProof {
 }
 
 export function merkleProof(authorities: string[]) {
-  const addresses = authorities.map((pk: string) => ethereumEncode(pk));
-  console.log("addresses", addresses);
-
-  const leaves = addresses.map((address: string) => keccak256AsU8a(address));
-  const tree = new MerkleTree(leaves, keccak256AsU8a);
-
+  const leaves = authorities.map((pk: string) => ethereumEncode(pk));
+  console.log("leaves", leaves);
+  let options = {
+    hashLeaves: true,
+  };
+  const tree = new MerkleTree(leaves, keccak256AsU8a, options);
   const root: H256 = createType(registry, "H256", u8aToU8a(tree.getRoot()));
-
-  const merkleProof = leaves.map((leaf: any, index: number) => {
-    const hexProof: string[] = tree.getHexProof(leaf);
+  const merkleProof = leaves.map((leaf: string, index: number) => {
+    const hexProof: string[] = tree.getHexProof(
+      Buffer.from(keccak256AsU8a(leaf))
+    );
     const proof: H256[] = hexProof.map((hash) =>
       createType(registry, "H256", u8aToU8a(hash))
     );
@@ -33,7 +34,7 @@ export function merkleProof(authorities: string[]) {
       proof: proof,
       number_of_leaves: leaves.length,
       leaf_index: index,
-      leaf: addresses[index],
+      leaf: leaves[index],
     };
     return mp;
   });
