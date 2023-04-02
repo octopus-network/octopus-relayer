@@ -3,12 +3,16 @@ import { publishMessage, synchronousPull } from "./pubsub";
 
 import { merkleProof } from "./merkletree";
 
+const projectId = "octopus-dev-309403";
 const topicVersionedFinalityProof =
   "projects/octopus-dev-309403/topics/test-appchain-versioned-finality-proof";
 const topicMessage = "projects/octopus-dev-309403/topics/test-appchain-message";
-const projectId = "octopus-dev-309403";
+const topicUnsignedMessage =
+  "projects/octopus-dev-309403/topics/test-appchain-unsigned-message";
 const subscriptionMessage =
   "projects/octopus-dev-309403/subscriptions/test-appchain-message-sub";
+const subscriptionUnsignedMessage =
+  "projects/octopus-dev-309403/subscriptions/test-appchain-unsigned-message-sub";
 
 async function main() {
   const wsProvider = new WsProvider("ws://127.0.0.1:9944");
@@ -26,6 +30,11 @@ async function main() {
   const finalizedHead = await api.rpc.beefy.getFinalizedHead();
   console.log(`appchain publisher started at ${finalizedHead}.`);
 
+  await Promise.all([handleVersionedFinalityProof(api), handleMessage(api)]);
+}
+
+async function handleVersionedFinalityProof(api: ApiPromise) {
+  console.log("in handleVersionedFinalityProof");
   await api.rpc.beefy.subscribeJustifications(async (beefySignedCommitment) => {
     console.log(`beefySignedCommitment: ${beefySignedCommitment}`);
     const blockNumber = beefySignedCommitment.commitment.blockNumber;
@@ -69,7 +78,13 @@ async function main() {
       // TODO
     }
 
-    await synchronousPull(projectId, subscriptionMessage);
+    const messageProofs = await synchronousPull(
+      api,
+      projectId,
+      subscriptionUnsignedMessage,
+      Number(blockNumber),
+      hash
+    );
 
     await publishMessage(
       topicVersionedFinalityProof,
@@ -77,18 +92,14 @@ async function main() {
         beefySignedCommitment: beefySignedCommitment,
         authoritySetProof: authoritySetProof,
         mmrProof: mmrProof,
+        messageProofs: messageProofs,
       })
     );
   });
 }
 
-async function main1() {
-  const wsProvider = new WsProvider(
-    "wss://gateway.testnet.octopus.network/myriad/8f543a1c219f14d83c0faedefdd5be6e"
-  );
-  const api = await ApiPromise.create({
-    provider: wsProvider,
-  });
+async function handleMessage(api: ApiPromise) {
+  console.log("in handleMessage");
   const unsubscribe = await api.rpc.chain.subscribeFinalizedHeads((header) => {
     header.digest.logs.forEach(async (log) => {
       if (log.isOther) {
@@ -99,12 +110,20 @@ async function main1() {
         );
         console.log(`crossChainMessages: ${crossChainMessages}`);
         await publishMessage(
-          topicMessage,
+          topicUnsignedMessage,
           JSON.stringify({
             blockNumber: header.number.toNumber(),
             commitmentHash: commitmentHash,
             crossChainMessages: crossChainMessages,
             header: header.toHex(),
+          })
+        );
+        await publishMessage(
+          topicMessage,
+          JSON.stringify({
+            blockNumber: header.number.toNumber(),
+            commitmentHash: commitmentHash,
+            crossChainMessages: crossChainMessages,
           })
         );
       }

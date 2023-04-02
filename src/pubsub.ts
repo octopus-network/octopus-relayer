@@ -1,5 +1,12 @@
 // Imports the Google Cloud client library
 import { PubSub, v1 } from "@google-cloud/pubsub";
+import { ApiPromise } from "@polkadot/api";
+import { BlockHash, MmrLeafBatchProof } from "@polkadot/types/interfaces";
+
+export interface MessageProof {
+  proof: MmrLeafBatchProof;
+  message: any;
+}
 
 // Creates a client; cache this for further use
 const pubSubClient = new PubSub();
@@ -25,8 +32,11 @@ export async function publishMessage(topicNameOrId: string, data: string) {
 const subClient = new v1.SubscriberClient();
 
 export async function synchronousPull(
+  api: ApiPromise,
   projectId: string,
-  subscriptionNameOrId: string
+  subscriptionNameOrId: string,
+  until: number,
+  hash: BlockHash
 ) {
   // The low level API client requires a name only.
   const formattedSubscription =
@@ -46,10 +56,23 @@ export async function synchronousPull(
 
   // Process the messages.
   const ackIds: string[] = [];
+  const messageProofs: MessageProof[] = [];
   for (const message of response.receivedMessages ?? []) {
     console.log(`Received message: ${message.message?.data}`);
-    if (message.ackId) {
-      ackIds.push(message.ackId);
+    const obj = JSON.parse(`${message.message?.data}`);
+    if (obj.blockNumber < until) {
+      const leafIndex = obj.blockNumber;
+
+      console.log(`Generate MMR proof for leafIndex: ${leafIndex} at ${until}`);
+      const mmrProof = await api.rpc.mmr.generateProof(
+        [leafIndex],
+        until,
+        hash
+      );
+      messageProofs.push({ proof: mmrProof, message: obj });
+      if (message.ackId) {
+        ackIds.push(message.ackId);
+      }
     }
   }
 
@@ -62,6 +85,7 @@ export async function synchronousPull(
     };
 
     await subClient.acknowledge(ackRequest);
+    return messageProofs;
   }
 
   console.log("Done.");
