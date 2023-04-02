@@ -24,6 +24,13 @@ async function main() {
         commitment: "BeefyCommitment",
         signatures: "Vec<Option<EcdsaSignature>>",
       },
+      MerkleProof: {
+        root: "H256",
+        proof: "Vec<H256>",
+        number_of_leaves: "u64",
+        leaf_index: "u64",
+        leaf: "Bytes",
+      },
     },
   });
 
@@ -64,8 +71,10 @@ async function handleVersionedFinalityProof(api: ApiPromise) {
     console.log(`nextAuthorities: ${nextAuthorities}`);
     console.log(`validatorSet: ${validatorSet}`);
 
-    const authoritySetProof = merkleProof(authorities.toJSON() as string[]);
-    console.log(`authoritySetProof: ${JSON.stringify(authoritySetProof)}`);
+    const authoritySetProof = merkleProof(
+      api,
+      authorities.toJSON() as string[]
+    );
 
     const mmrProof = await api.rpc.mmr.generateProof(
       [leafIndex],
@@ -85,6 +94,16 @@ async function handleVersionedFinalityProof(api: ApiPromise) {
       Number(blockNumber),
       hash
     );
+
+    // for testing
+    console.log(`hex beefySignedCommitment: ${beefySignedCommitment.toHex()}`);
+    for (const p of authoritySetProof) {
+      console.log(`hex authoritySetProof: ${p.toHex()}`);
+    }
+    console.log(`hex mmrProof: ${mmrProof.toHex()}`);
+    for (const p of messageProofs ?? []) {
+      console.log(`hex MmrLeafBatchProof: ${p.proof.toHex()}`);
+    }
 
     await publishMessage(
       topicVersionedFinalityProof,
@@ -108,7 +127,9 @@ async function handleMessage(api: ApiPromise) {
           "PERSISTENT",
           commitmentHash
         );
+        console.log(`commitmentHash: ${commitmentHash}`);
         console.log(`crossChainMessages: ${crossChainMessages}`);
+        console.log(`header: ${header.toHex()}`);
         await publishMessage(
           topicUnsignedMessage,
           JSON.stringify({

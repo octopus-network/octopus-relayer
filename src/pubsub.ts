@@ -69,6 +69,7 @@ export async function synchronousPull(
         until,
         hash
       );
+      console.log(`messageProof: ${mmrProof}`);
       messageProofs.push({ proof: mmrProof, message: obj });
       if (message.ackId) {
         ackIds.push(message.ackId);
