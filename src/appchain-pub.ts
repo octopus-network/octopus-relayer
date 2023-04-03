@@ -1,6 +1,7 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
-import { publishMessage, synchronousPull } from "./pubsub";
+const colors = require("colors");
 
+import { publishMessage, synchronousPull } from "./pubsub";
 import { merkleProof } from "./merkletree";
 
 const projectId = "octopus-dev-309403";
@@ -22,7 +23,9 @@ async function main() {
       BeefySignedCommitment: {
         version: "u8",
         commitment: "BeefyCommitment",
-        signatures: "Vec<Option<EcdsaSignature>>",
+        signatures_from: "Bytes",
+        validator_set_len: "u32",
+        signatures_compact: "Vec<EcdsaSignature>",
       },
       MerkleProof: {
         root: "H256",
@@ -43,7 +46,7 @@ async function main() {
 async function handleVersionedFinalityProof(api: ApiPromise) {
   console.log("in handleVersionedFinalityProof");
   await api.rpc.beefy.subscribeJustifications(async (beefySignedCommitment) => {
-    console.log(`beefySignedCommitment: ${beefySignedCommitment}`);
+    console.log(`versionedFinalityProof: ${beefySignedCommitment}`);
     const blockNumber = beefySignedCommitment.commitment.blockNumber;
     const leafIndex = Number(blockNumber) - 1;
 
@@ -76,12 +79,12 @@ async function handleVersionedFinalityProof(api: ApiPromise) {
       authorities.toJSON() as string[]
     );
 
-    const mmrProof = await api.rpc.mmr.generateProof(
+    const leavesProof = await api.rpc.mmr.generateProof(
       [leafIndex],
       blockNumber, // TODO
       hash
     );
-    console.log(`mmrProof: ${mmrProof}`);
+    console.log(colors.red(`leavesProof: ${leavesProof}`));
 
     if (JSON.stringify(authorities) !== JSON.stringify(nextAuthorities)) {
       // TODO
@@ -96,13 +99,11 @@ async function handleVersionedFinalityProof(api: ApiPromise) {
     );
 
     // for testing
-    console.log(`hex beefySignedCommitment: ${beefySignedCommitment.toHex()}`);
+    console.log(
+      colors.red(`versionedFinalityProof: ${beefySignedCommitment.toHex()}`)
+    );
     for (const p of authoritySetProof) {
-      console.log(`hex authoritySetProof: ${p.toHex()}`);
-    }
-    console.log(`hex mmrProof: ${mmrProof.toHex()}`);
-    for (const p of messageProofs ?? []) {
-      console.log(`hex MmrLeafBatchProof: ${p.proof.toHex()}`);
+      console.log(colors.red(`authoritySetProof: ${p.toHex()}`));
     }
 
     await publishMessage(
@@ -110,7 +111,8 @@ async function handleVersionedFinalityProof(api: ApiPromise) {
       JSON.stringify({
         beefySignedCommitment: beefySignedCommitment,
         authoritySetProof: authoritySetProof,
-        mmrProof: mmrProof,
+        mmrLeaves: leavesProof.leaves,
+        mmrProof: leavesProof.proof,
         messageProofs: messageProofs,
       })
     );
@@ -128,8 +130,8 @@ async function handleMessage(api: ApiPromise) {
           commitmentHash
         );
         console.log(`commitmentHash: ${commitmentHash}`);
-        console.log(`crossChainMessages: ${crossChainMessages}`);
-        console.log(`header: ${header.toHex()}`);
+        console.log(colors.red(`crossChainMessages: ${crossChainMessages}`));
+        console.log(colors.red(`header: ${header.toHex()}`));
         await publishMessage(
           topicUnsignedMessage,
           JSON.stringify({

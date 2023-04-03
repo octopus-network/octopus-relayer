@@ -1,10 +1,14 @@
 // Imports the Google Cloud client library
 import { PubSub, v1 } from "@google-cloud/pubsub";
 import { ApiPromise } from "@polkadot/api";
-import { BlockHash, MmrLeafBatchProof } from "@polkadot/types/interfaces";
+import { BlockHash } from "@polkadot/types/interfaces";
+import { Bytes } from "@polkadot/types";
+
+const colors = require("colors");
 
 export interface MessageProof {
-  proof: MmrLeafBatchProof;
+  leaves: Bytes;
+  proof: Bytes;
   message: any;
 }
 
@@ -60,17 +64,21 @@ export async function synchronousPull(
   for (const message of response.receivedMessages ?? []) {
     console.log(`Received message: ${message.message?.data}`);
     const obj = JSON.parse(`${message.message?.data}`);
-    if (obj.blockNumber < until) {
-      const leafIndex = obj.blockNumber;
+    if (obj.blockNumber + 1 <= until) {
+      const leafIndex = obj.blockNumber + 1;
 
       console.log(`Generate MMR proof for leafIndex: ${leafIndex} at ${until}`);
-      const mmrProof = await api.rpc.mmr.generateProof(
+      const leavesProof = await api.rpc.mmr.generateProof(
         [leafIndex],
         until,
         hash
       );
-      console.log(`messageProof: ${mmrProof}`);
-      messageProofs.push({ proof: mmrProof, message: obj });
+      console.log(colors.red(`messageProof: ${leavesProof}`));
+      messageProofs.push({
+        leaves: leavesProof.leaves,
+        proof: leavesProof.proof,
+        message: obj,
+      });
       if (message.ackId) {
         ackIds.push(message.ackId);
       }
