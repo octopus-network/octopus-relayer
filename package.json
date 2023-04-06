@@ -8,22 +8,29 @@
     "build": "tsc --build",
     "clean": "tsc --build --clean",
     "appchain-pub": "ts-node src/appchain-pub.ts",
-    "near-sub": "ts-node src/near-sub.ts"
+    "near-sub": "ts-node src/near-sub.ts",
+    "icp-subpub": "ts-node src/icp-subpub.ts"
   },
   "keywords": [],
   "author": "Julian Sun",
   "license": "ISC",
   "devDependencies": {
+    "@types/isomorphic-fetch": "^0.0.36",
     "prettier": "^2.8.7",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.2"
   },
   "dependencies": {
     "@google-cloud/pubsub": "^3.4.1",
-    "@polkadot/api": "^10.2.1",
     "@polkadot/util-crypto": "^11.1.2",
+    "@polkadot/api": "^10.2.1",
     "colors": "^1.4.0",
     "merkletreejs": "^0.3.9",
-    "near-api-js": "^2.0.4"
+    "near-api-js": "^2.0.4",
+    "@dfinity/agent": "^0.15.4",
+    "@dfinity/identity": "^0.15.4",
+    "@dfinity/principal": "^0.15.4",
+    "@dfinity/candid": "^0.15.5",
+    "isomorphic-fetch": "^3.0.0"
   }
 }
