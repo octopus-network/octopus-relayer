@@ -9,7 +9,7 @@
     "clean": "tsc --build --clean",
     "appchain-pub": "ts-node src/appchain-pub.ts",
     "near-sub": "ts-node src/near-sub.ts",
-    "icp-subpub": "ts-node src/icp-sub.ts"
+    "icp-sub": "ts-node src/icp-sub.ts"
   },
   "keywords": [],
   "author": "Julian Sun",

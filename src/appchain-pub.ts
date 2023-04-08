@@ -3,6 +3,7 @@ const colors = require("colors");
 
 import { publishMessage, synchronousPull } from "./pubsub";
 import { merkleProof } from "./merkletree";
+import { toHex } from "@dfinity/agent";
 
 const projectId = "octopus-dev-309403";
 const topicVersionedFinalityProof =
@@ -102,15 +103,19 @@ async function handleVersionedFinalityProof(api: ApiPromise) {
     console.log(
       colors.red(`versionedFinalityProof: ${beefySignedCommitment.toHex()}`)
     );
-    for (const p of authoritySetProof) {
-      console.log(colors.red(`authoritySetProof: ${p.toHex()}`));
-    }
+
+    let authoritySetProofs: any[] = [];
+    authoritySetProofs = authoritySetProof.map((p) => {
+      const hex = p.toHex();
+      console.log(colors.red(`authoritySetProof: ${hex}`));
+      return hex;
+    });
 
     await publishMessage(
       topicVersionedFinalityProof,
       JSON.stringify({
-        beefySignedCommitment: beefySignedCommitment,
-        authoritySetProof: authoritySetProof,
+        beefySignedCommitment: beefySignedCommitment.toHex(),
+        authoritySetProof: authoritySetProofs,
         mmrLeaves: leavesProof.leaves,
         mmrProof: leavesProof.proof,
         messageProofs: messageProofs,

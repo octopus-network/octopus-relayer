@@ -45,9 +45,9 @@ let actor: any = null;
 async function newIcpClient() {
   if (actor == null) {
     actor = await newActor();
-    await getPublicKey(actor);
     // await setIcpClient(actor, "test", initial_public_keys);
     await resetIcpClient(actor, "test", initial_public_keys);
+    await getPublicKey(actor);
   }
 }
 
@@ -75,80 +75,98 @@ export async function synchronousPull(
     maxMessages: 10,
   };
 
-  // The subscriber pulls a specified number of messages.
-  const [response] = await subClient.pull(request);
+  for (;;) {
+    // The subscriber pulls a specified number of messages.
+    const [response] = await subClient.pull(request);
 
-  // Process the messages.
-  const ackIds: string[] = [];
-  for (const message of response.receivedMessages ?? []) {
-    console.log(`Received message: ${message.message?.data}`);
-    const obj = JSON.parse(`${message.message?.data}`);
+    // Process the messages.
+    const ackIds: string[] = [];
+    for (const message of response.receivedMessages ?? []) {
+      console.log(`Received message: ${message.message?.data}`);
+      const obj = JSON.parse(`${message.message?.data}`);
 
-    // 1. update state
-    // TODO: This section could be optimized as not need update state every time.
-    console.log("Before update state:");
-    let versionedFinalityProof = hexStringToUint8Array(
-      obj.beefySignedCommitment
-    );
-    let authoritySetProof = obj.authoritySetProof.map(hexStringToUint8Array);
-    let mmrLeaves = hexStringToUint8Array(obj.mmrLeaves);
-    let mmrProof = hexStringToUint8Array(obj.mmrProof);
+      // 1. update state
+      // TODO: This section could be optimized as not need update state every time.
+      console.log("Before update state:");
+      let versionedFinalityProof = hexStringToUint8Array(
+        obj.beefySignedCommitment
+      );
+      let authoritySetProof = obj.authoritySetProof.map(hexStringToUint8Array);
+      let mmrLeaves = hexStringToUint8Array(obj.mmrLeaves);
+      let mmrProof = hexStringToUint8Array(obj.mmrProof);
 
-    console.log(`versionedFinalityProof:  ${versionedFinalityProof}`);
-    console.log(`authoritySetProof: ${authoritySetProof}`);
-    console.log(`mmrLeaves: ${mmrLeaves}`);
-    console.log(`mmrProof: ${mmrProof}`);
+      // console.log(`versionedFinalityProof:  ${versionedFinalityProof}`);
+      // console.log(`authoritySetProof: ${authoritySetProof}`);
+      // console.log(`mmrLeaves: ${mmrLeaves}`);
+      // console.log(`mmrProof: ${mmrProof}`);
 
-    const result = await updateStateForCanister(
-      actor,
-      versionedFinalityProof,
-      authoritySetProof,
-      mmrLeaves,
-      mmrProof
-    );
-    console.log(`Update state result: ${result}`);
+      const result = await updateStateForCanister(
+        actor,
+        versionedFinalityProof,
+        authoritySetProof,
+        mmrLeaves,
+        mmrProof
+      );
+      console.log("Update state result:", result);
 
-    // 2. verify messages
-    console.log("Before sign messages:");
-    let messages = hexStringToUint8Array(obj.message.crossChainMessages);
-    let encodedHeader = hexStringToUint8Array(obj.message.header);
-    let encodedMmrLeaves = hexStringToUint8Array(obj.leaves);
-    let encodedMmrProof = hexStringToUint8Array(obj.proof);
-    const signature = await signMessages(
-      actor,
-      messages,
-      encodedHeader,
-      encodedMmrLeaves,
-      encodedMmrProof
-    );
-    console.log("After sign messages, signature is: ", signature);
+      if (obj.messageProofs && obj.messageProofs.length) {
+        for (let i = 0; i < obj.messageProofs.length; i++) {
+          const messageProof = obj.messageProofs[i];
+          console.log("messageProof:", messageProof);
 
-    // 3. publish signed messages
-    await publishMessage(
-      topicSignedMessage,
-      JSON.stringify({
-        encoded_messages: messages,
-        verification_proxy_signature: signature,
-      })
-    );
+          // 2. verify messages
+          console.log("Before sign messages:");
+          let messages = hexStringToUint8Array(
+            messageProof.message.crossChainMessages
+          );
+          let encodedHeader = hexStringToUint8Array(
+            messageProof.message.header
+          );
+          let encodedMmrLeaves = hexStringToUint8Array(messageProof.leaves);
+          let encodedMmrProof = hexStringToUint8Array(messageProof.proof);
+          const signature = await signMessages(
+            actor,
+            messages,
+            encodedHeader,
+            encodedMmrLeaves,
+            encodedMmrProof
+          );
 
-    if (message.ackId) {
-      ackIds.push(message.ackId);
+          if (signature) {
+            console.log("After sign messages, signature is: ", signature);
+
+            // 3. publish signed messages
+            await publishMessage(
+              topicSignedMessage,
+              JSON.stringify({
+                encodedMessages: messages,
+                verificationProxySignature: signature,
+              })
+            );
+          } else {
+            console.log("Sign messages error, error is: ", signature);
+          }
+        }
+      }
+
+      if (message.ackId) {
+        ackIds.push(message.ackId);
+      }
     }
+
+    if (ackIds.length !== 0) {
+      // Acknowledge all of the messages. You could also acknowledge
+      // these individually, but this is more efficient.
+      const ackRequest = {
+        subscription: formattedSubscription,
+        ackIds: ackIds,
+      };
+
+      await subClient.acknowledge(ackRequest);
+    }
+
+    console.log("Done.");
   }
-
-  if (ackIds.length !== 0) {
-    // Acknowledge all of the messages. You could also acknowledge
-    // these individually, but this is more efficient.
-    const ackRequest = {
-      subscription: formattedSubscription,
-      ackIds: ackIds,
-    };
-
-    // await subClient.acknowledge(ackRequest);
-  }
-
-  console.log("Done.");
 }
 
 async function testUpdateState() {

@@ -44,8 +44,10 @@ interface MessageWithSignature {
 async function main() {
   const isWitnessMode = await checkAnchorIsWitnessMode();
   if (isWitnessMode) {
+    console.log("Witness mode!");
     await handleMessage();
   } else {
+    console.log("Not witness mode!");
     await handleVersionedFinalityProof();
   }
 }
@@ -85,43 +87,48 @@ export async function synchronousPull(
     maxMessages: 10,
   };
 
-  // The subscriber pulls a specified number of messages.
-  const [response] = await subClient.pull(request);
+  for (;;) {
+    // The subscriber pulls a specified number of messages.
+    const [response] = await subClient.pull(request);
 
-  // Process the messages.
-  const ackIds: string[] = [];
-  for (const message of response.receivedMessages ?? []) {
-    console.log(`Received message: ${message.message?.data}`);
+    // Process the messages.
+    const ackIds: string[] = [];
+    for (const message of response.receivedMessages ?? []) {
+      console.log(`Received message: ${message.message?.data}`);
 
-    let args = parseFunction(`${message.message?.data}`);
-    console.log(`args: ${args}`);
+      let args = parseFunction(`${message.message?.data}`);
+      console.log("args: ", args);
 
-    const result = await account.functionCall({
-      contractId: CONTRACT_NAME,
-      methodName: "stage_and_apply_appchain_messages",
-      args: args,
-      gas: DEFAULT_FUNCTION_CALL_GAS,
-      attachedDeposit: new BN("0"),
-    });
-    console.log(`functionCall result: ${result}`);
-
-    if (message.ackId) {
-      ackIds.push(message.ackId);
+      try {
+        const result = await account.functionCall({
+          contractId: CONTRACT_NAME,
+          methodName: "stage_and_apply_appchain_messages",
+          args: args,
+          gas: DEFAULT_FUNCTION_CALL_GAS,
+          attachedDeposit: new BN("0"),
+        });
+        console.log("functionCall result:", result);
+      } catch (e: any) {
+        console.error("Call near function error", e);
+      }
+      if (message.ackId) {
+        ackIds.push(message.ackId);
+      }
     }
+
+    if (ackIds.length !== 0) {
+      // Acknowledge all of the messages. You could also acknowledge
+      // these individually, but this is more efficient.
+      const ackRequest = {
+        subscription: formattedSubscription,
+        ackIds: ackIds,
+      };
+
+      await subClient.acknowledge(ackRequest);
+    }
+
+    console.log("Done.");
   }
-
-  if (ackIds.length !== 0) {
-    // Acknowledge all of the messages. You could also acknowledge
-    // these individually, but this is more efficient.
-    const ackRequest = {
-      subscription: formattedSubscription,
-      ackIds: ackIds,
-    };
-
-    // await subClient.acknowledge(ackRequest);
-  }
-
-  console.log("Done.");
 }
 
 async function checkAnchorIsWitnessMode(): Promise<Boolean> {
@@ -134,12 +141,6 @@ async function checkAnchorIsWitnessMode(): Promise<Boolean> {
       {}
     );
 
-    // const contract = await near.Contract(account, CONTRACT_NAME, {
-    //   viewMethods: ["get_anchor_settings"],
-    //   changeMethods: [],
-    //   sender: account.accountId,
-    // });
-
     console.log("setting: ", anchorSettings);
     return anchorSettings ? anchorSettings.witness_mode : false;
   } catch (error) {
@@ -150,12 +151,11 @@ async function checkAnchorIsWitnessMode(): Promise<Boolean> {
 
 function parseSignedMessage(text: any): MessageWithSignature {
   const obj = JSON.parse(text);
+  // console.log("encoded_messages: ", obj.encodedMessages);
+  // console.log("signature: ", obj.verificationProxySignature);
   let messageWithSignature: MessageWithSignature = {
-    //TODO: Need check
-    encoded_messages: Array.from(Buffer.from(obj.encoded_messages, "hex")),
-    verification_proxy_signature: Array.from(
-      Buffer.from(obj.verification_proxy_signature, "hex")
-    ),
+    encoded_messages: Object.values(obj.encodedMessages),
+    verification_proxy_signature: Object.values(obj.verificationProxySignature),
   };
 
   return messageWithSignature;
