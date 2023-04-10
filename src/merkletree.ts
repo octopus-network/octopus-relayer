@@ -9,6 +9,7 @@ export function merkleProof(api: ApiPromise, authorities: string[]) {
   console.log("leaves", leaves);
   let options = {
     hashLeaves: true,
+    sortPairs: true,
   };
   const tree = new MerkleTree(leaves, keccak256AsU8a, options);
   const root: H256 = api.createType("H256", u8aToU8a(tree.getRoot()));
