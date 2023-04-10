@@ -4,13 +4,13 @@ import { Ed25519KeyIdentity } from "@dfinity/identity";
 import { idlFactory } from "./idl";
 import { _SERVICE as Service } from "./idl.d";
 
-// local
-const host = "http://127.0.0.1:4943";
-const canisterId = "wxns6-qiaaa-aaaaa-aaaqa-cai";
+// // local
+// const host = "http://127.0.0.1:4943";
+// const canisterId = "wxns6-qiaaa-aaaaa-aaaqa-cai";
 
-// // mainnet
-// const host = "https://ic0.app";
-// const canisterId = "3udup-lqaaa-aaaan-qc5ua-cai";
+// mainnet
+const host = "https://ic0.app";
+const canisterId = "3udup-lqaaa-aaaan-qc5ua-cai";
 
 const aliceIdentity = Ed25519KeyIdentity.generate();
 

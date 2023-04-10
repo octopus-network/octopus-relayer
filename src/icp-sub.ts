@@ -45,8 +45,8 @@ let actor: any = null;
 async function newIcpClient() {
   if (actor == null) {
     actor = await newActor();
-    // await setIcpClient(actor, "test", initial_public_keys);
-    await resetIcpClient(actor, "test", initial_public_keys);
+    await setIcpClient(actor, "test", initial_public_keys);
+    // await resetIcpClient(actor, "test", initial_public_keys);
     await getPublicKey(actor);
   }
 }
