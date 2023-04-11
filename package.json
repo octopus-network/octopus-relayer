@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc --build",
+    "build": "tsc -p .",
     "clean": "tsc --build --clean",
     "appchain-pub": "ts-node src/appchain-pub.ts",
     "near-sub": "ts-node src/near-sub.ts",
@@ -25,6 +25,7 @@
     "@polkadot/util-crypto": "^11.1.2",
     "@polkadot/api": "^10.2.1",
     "colors": "^1.4.0",
+    "dotenv": "^16.0.3",
     "merkletreejs": "^0.3.9",
     "near-api-js": "^0.41.0",
     "@dfinity/agent": "^0.15.4",

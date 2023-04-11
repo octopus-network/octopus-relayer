@@ -1,23 +1,13 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
-const colors = require("colors");
+import colors from "colors";
 
 import { publishMessage, synchronousPull } from "./pubsub";
 import { merkleProof } from "./merkletree";
-import { toHex } from "@dfinity/agent";
 
-const projectId = "octopus-dev-309403";
-const topicVersionedFinalityProof =
-  "projects/octopus-dev-309403/topics/test-appchain-versioned-finality-proof";
-const topicMessage = "projects/octopus-dev-309403/topics/test-appchain-message";
-const topicUnsignedMessage =
-  "projects/octopus-dev-309403/topics/test-appchain-unsigned-message";
-const subscriptionMessage =
-  "projects/octopus-dev-309403/subscriptions/test-appchain-message-sub";
-const subscriptionUnsignedMessage =
-  "projects/octopus-dev-309403/subscriptions/test-appchain-unsigned-message-sub";
+import { projectId, topicVersionedFinalityProof, topicMessage, topicUnsignedMessage, subscriptionUnsignedMessage, appchainSetting } from "./constants";
 
 async function main() {
-  const wsProvider = new WsProvider("ws://127.0.0.1:9944");
+  const wsProvider = new WsProvider(appchainSetting.wsRpcEndpoint);
   const api = await ApiPromise.create({
     provider: wsProvider,
     types: {

@@ -1,40 +1,42 @@
 import { v1 } from "@google-cloud/pubsub";
 import BN from "bn.js";
 
-const { connect, keyStores } = require("near-api-js");
-const path = require("path");
-const homedir = require("os").homedir();
+import { connect, keyStores, utils, Account } from "near-api-js";
 
-const CREDENTIALS_DIR = ".near-credentials";
-// const CONTRACT_NAME = "barnacle-latest.registry.test_oct.testnet";
-const CONTRACT_NAME = "andy-test-relayer.registry.test_oct.testnet";
-// const ACCOUNT_ID = "test-relayer.testnet";
-const ACCOUNT_ID = "oct-pallet-test.testnet";
-const credentialsPath = path.join(homedir, CREDENTIALS_DIR);
-const keyStore = new keyStores.UnencryptedFileSystemKeyStore(credentialsPath);
+import {
+  nearSettings,
+  appchainSetting,
+  contracts,
+  relayerNearAccount,
+  projectId,
+  subscriptionSignedMessage,
+  subscriptionMessage,
+} from "./constants";
+
+let account: Account;
+const { registryContract } = contracts;
+const CONTRACT_NAME = `${appchainSetting.appchainId}.${registryContract}`;
 const DEFAULT_FUNCTION_CALL_GAS = new BN("300000000000000");
 
-const config = {
-  keyStore,
-  networkId: "testnet",
-  // nodeUrl: "https://rpc.testnet.near.org",
-  nodeUrl: "https://near-testnet.infura.io/v3/dabe9e95376540b083ae09909ea7c576",
-};
+async function initNearAccount() {
+  const { nearEnv, nearNodeUrl, walletUrl, helperUrl } = nearSettings;
+  const { id: relayerId, privateKey } = relayerNearAccount;
 
-const projectId = "octopus-dev-309403";
-const topicVersionedFinalityProof =
-  "projects/octopus-dev-309403/topics/test-appchain-versioned-finality-proof";
-const topicMessage = "projects/octopus-dev-309403/topics/test-appchain-message";
-const topicSignedMessage =
-  "projects/octopus-dev-309403/topics/test-appchain-signed-message";
-const topicUnsignedMessage =
-  "projects/octopus-dev-309403/topics/test-appchain-unsigned-message";
-const subscriptionMessage =
-  "projects/octopus-dev-309403/subscriptions/test-appchain-message-sub";
-const subscriptionSignedMessage =
-  "projects/octopus-dev-309403/subscriptions/test-appchain-signed-message-sub";
-const subscriptionUnsignedMessage =
-  "projects/octopus-dev-309403/subscriptions/test-appchain-unsigned-message-sub";
+  const keyPair = utils.KeyPair.fromString(privateKey as string);
+
+  const keyStore = new keyStores.InMemoryKeyStore();
+  keyStore.setKey(nearEnv, relayerId, keyPair);
+
+  const near = await connect({
+    networkId: nearEnv,
+    keyStore,
+    nodeUrl: nearNodeUrl as string,
+    walletUrl,
+    helperUrl,
+  });
+  account = await near.account(relayerId);
+  return account;
+}
 
 interface MessageWithSignature {
   encoded_messages: number[];
@@ -72,8 +74,7 @@ export async function synchronousPull(
   projectId: string,
   subscriptionNameOrId: string
 ) {
-  const near = await connect({ ...config, keyStore });
-  const account = await near.account(ACCOUNT_ID);
+  account = await initNearAccount();
   // The low level API client requires a name only.
   const formattedSubscription =
     subscriptionNameOrId.indexOf("/") >= 0
@@ -87,7 +88,7 @@ export async function synchronousPull(
     maxMessages: 10,
   };
 
-  for (;;) {
+  for (; ;) {
     // The subscriber pulls a specified number of messages.
     const [response] = await subClient.pull(request);
 
@@ -133,8 +134,7 @@ export async function synchronousPull(
 
 async function checkAnchorIsWitnessMode(): Promise<Boolean> {
   try {
-    const near = await connect({ ...config, keyStore });
-    const account = await near.account(ACCOUNT_ID);
+    account = await initNearAccount();
     const anchorSettings = await account.viewFunction(
       CONTRACT_NAME,
       "get_anchor_settings",

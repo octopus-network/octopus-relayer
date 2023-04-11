@@ -1,38 +1,8 @@
 import { v1 } from "@google-cloud/pubsub";
 import { publishMessage } from "./pubsub";
-import {
-  newActor,
-  getPublicKey,
-  setIcpClient,
-  resetIcpClient,
-  updateState as updateStateForCanister,
-  signMessages,
-} from "./icp/icp";
-import {
-  initial_public_keys,
-  state,
-  header,
-  mmr_leaf,
-  mmr_proof,
-  messages2,
-} from "./icp/mock";
+import { newActor, getPublicKey, setIcpClient, resetIcpClient, updateState as updateStateForCanister, signMessages } from "./icp/icp";
 
-const projectId = "octopus-dev-309403";
-const topicVersionedFinalityProof =
-  "projects/octopus-dev-309403/topics/test-appchain-versioned-finality-proof";
-const topicMessage = "projects/octopus-dev-309403/topics/test-appchain-message";
-const topicSignedMessage =
-  "projects/octopus-dev-309403/topics/test-appchain-signed-message";
-const topicUnsignedMessage =
-  "projects/octopus-dev-309403/topics/test-appchain-unsigned-message";
-const subscriptionMessage =
-  "projects/octopus-dev-309403/subscriptions/test-appchain-message-sub";
-const subscriptionSignedMessage =
-  "projects/octopus-dev-309403/subscriptions/test-appchain-signed-message-sub";
-const subscriptionUnsignedMessage =
-  "projects/octopus-dev-309403/subscriptions/test-appchain-unsigned-message-sub";
-const subscriptionVersionedFinalityProof =
-  "projects/octopus-dev-309403/subscriptions/test-appchain-versioned-finality-proof-sub";
+import { initial_public_keys, projectId, topicSignedMessage, subscriptionVersionedFinalityProof } from "./constants";
 
 async function main() {
   await newIcpClient();
@@ -75,7 +45,7 @@ export async function synchronousPull(
     maxMessages: 10,
   };
 
-  for (;;) {
+  for (; ;) {
     // The subscriber pulls a specified number of messages.
     const [response] = await subClient.pull(request);
 
