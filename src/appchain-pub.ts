@@ -1,22 +1,13 @@
 import { ApiPromise, WsProvider } from "@polkadot/api";
-const colors = require("colors");
+import colors from "colors";
 
 import { publishMessage, synchronousPull } from "./pubsub";
 import { merkleProof } from "./merkletree";
 
-const projectId = "octopus-dev-309403";
-const topicVersionedFinalityProof =
-  "projects/octopus-dev-309403/topics/test-appchain-versioned-finality-proof";
-const topicMessage = "projects/octopus-dev-309403/topics/test-appchain-message";
-const topicUnsignedMessage =
-  "projects/octopus-dev-309403/topics/test-appchain-unsigned-message";
-const subscriptionMessage =
-  "projects/octopus-dev-309403/subscriptions/test-appchain-message-sub";
-const subscriptionUnsignedMessage =
-  "projects/octopus-dev-309403/subscriptions/test-appchain-unsigned-message-sub";
+import { projectId, topicVersionedFinalityProof, topicMessage, topicUnsignedMessage, subscriptionUnsignedMessage, appchainSetting } from "./constants";
 
 async function main() {
-  const wsProvider = new WsProvider("ws://127.0.0.1:9944");
+  const wsProvider = new WsProvider(appchainSetting.wsRpcEndpoint);
   const api = await ApiPromise.create({
     provider: wsProvider,
     types: {
@@ -102,15 +93,19 @@ async function handleVersionedFinalityProof(api: ApiPromise) {
     console.log(
       colors.red(`versionedFinalityProof: ${beefySignedCommitment.toHex()}`)
     );
-    for (const p of authoritySetProof) {
-      console.log(colors.red(`authoritySetProof: ${p.toHex()}`));
-    }
+
+    let authoritySetProofs: any[] = [];
+    authoritySetProofs = authoritySetProof.map((p) => {
+      const hex = p.toHex();
+      console.log(colors.red(`authoritySetProof: ${hex}`));
+      return hex;
+    });
 
     await publishMessage(
       topicVersionedFinalityProof,
       JSON.stringify({
-        beefySignedCommitment: beefySignedCommitment,
-        authoritySetProof: authoritySetProof,
+        beefySignedCommitment: beefySignedCommitment.toHex(),
+        authoritySetProof: authoritySetProofs,
         mmrLeaves: leavesProof.leaves,
         mmrProof: leavesProof.proof,
         messageProofs: messageProofs,

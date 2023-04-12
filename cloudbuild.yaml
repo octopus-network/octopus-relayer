@@ -1,0 +1,11 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-f', 'appchain.Dockerfile', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME/appchain-pub', '.' ]
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-f', 'icp.Dockerfile', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME/icp-sub', '.' ]
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-f', 'near.Dockerfile', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME/near-sub', '.' ]
+images:
+- 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME/appchain-pub'
+- 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME/icp-sub'
+- 'us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME/near-pub'

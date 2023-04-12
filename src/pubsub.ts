@@ -5,6 +5,7 @@ import { BlockHash } from "@polkadot/types/interfaces";
 import { Bytes } from "@polkadot/types";
 
 const colors = require("colors");
+const projectId = "octopus-dev-309403";
 
 export interface MessageProof {
   leaves: Bytes;
@@ -13,7 +14,7 @@ export interface MessageProof {
 }
 
 // Creates a client; cache this for further use
-const pubSubClient = new PubSub();
+const pubSubClient = new PubSub({projectId: projectId});
 
 export async function publishMessage(topicNameOrId: string, data: string) {
   // Publishes the message as a string, e.g. "Hello, world!" or JSON.stringify(someObject)
