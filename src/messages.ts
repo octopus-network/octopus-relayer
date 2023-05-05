@@ -1,6 +1,6 @@
 import {
-  processAppchainMessages,
   checkAnchorMessagesNeedProcess,
+  processAppchainMessages,
 } from './nearCalls'
 import { dbRunAsync, dbGetAsync, upsertMessageProcessingProblems } from './db'
 import { Action } from './interfaces'
