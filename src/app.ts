@@ -12,10 +12,10 @@ import keccak256 from 'keccak256'
 import publicKeyToAddress from 'ethereum-public-key-to-address'
 import MerkleTree from 'merkletreejs'
 import {
-  initNearRpc,
   updateState,
   checkAnchorIsWitnessMode,
-  getLatestCommitmentBlockNumber,
+  getLatestCommitmentBlockNumber,  
+  initNearRpc,
 } from './nearCalls'
 import { initDb } from './db'
 import { MerkleProof, Session } from './interfaces'
